@@ -9,31 +9,20 @@ import os
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
 # ==========================================
-# CSS الشامل لضبط اتجاه اللغة من اليمين (RTL)
+# CSS الشامل لضبط الاتجاه RTL
 # ==========================================
 st.markdown("""
 <style>
-    /* فرض الاتجاه من اليمين إلى اليسار على كامل التطبيق */
     html, body, [data-testid="stAppViewContainer"] {
         direction: rtl !important;
         text-align: right !important;
     }
-    
-    /* ضبط التنسيق للعناصر */
     .stApp { direction: rtl !important; }
-    
-    /* تأمين محاذاة كافة النصوص */
     p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea, button {
         text-align: right !important;
-        direction: rtl !important;
     }
-    
-    /* ضبط القوائم المنسدلة */
-    div[data-baseweb="select"] {
-        text-align: right !important;
-    }
-    
-    .dashboard-card { border-radius: 12px; padding: 20px 10px; color: white; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    div[data-testid="stMarkdownContainer"] { text-align: right !important; }
+    div[role="radiogroup"] { gap: 10px; }
     .gray-bg { background-color: rgba(130, 130, 130, 0.08); padding: 5px 10px; border-radius: 5px; }
 </style>
 """, unsafe_allow_html=True)
@@ -57,70 +46,84 @@ def save_data(data):
 
 db = load_data()
 BASE_URL = db.get("base_url", "")
+
+# ==========================================
+# التعامل مع الرابط (التوجيه للمجموعة)
+# ==========================================
 query_params = st.query_params
+current_group_id = query_params.get("group")
 
 # ==========================================
-# واجهة التحكم والمنطق
+# واجهة المستخدم
 # ==========================================
-st.title("⚙️ لوحة التحكم المركزية")
+if current_group_id and current_group_id in db["groups"]:
+    group_data = db["groups"][current_group_id]
+    st.title(f"📖 {group_data['name']}")
+    
+    # دالة التحديث للربط بين التبويبات
+    def update_status(i, key):
+        new_status = st.session_state[key]
+        now = datetime.datetime.now().strftime("%Y-%m-%d %I:%M %p")
+        if "last_updates" not in group_data: group_data["last_updates"] = {}
+        group_data["last_updates"][str(i)] = {"time": now, "timestamp": datetime.datetime.now().timestamp()}
+        group_data['parts'][i] = new_status
+        save_data(db)
+        # مزامنة الأزرار
+        other_key = f"late_s_{i}" if key.startswith("s_") else f"s_{i}"
+        if other_key in st.session_state: st.session_state[other_key] = new_status
 
-# قراءة كلمة المرور وتأمين اللوحة
-admin_login = st.text_input("كلمة المرور:", type="password")
-
-if admin_login == "admin":
-    # استخدام مسميات واضحة ومختصرة لضمان التنسيق
-    tab1, tab2, tab3, tab4 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة", "📱 المتابعة والتذكير"])
+    tab1, tab2, tab3 = st.tabs(["📊 الجدول", "✅ تأكيد التلاوة", "📖 تفاصيل"])
     
     with tab1:
-        st.write("### روابط المجموعات:")
-        if not db["groups"]:
-            st.warning("لا توجد مجموعات حالياً.")
-        else:
+        for i in range(30):
+            cols = st.columns([1, 2, 7])
+            cols[0].write(f"**الجزء {i+1}**")
+            cols[1].write(group_data['readers'][i])
+            cols[2].radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"], 
+                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
+                          key=f"s_{i}", horizontal=True, label_visibility="collapsed",
+                          on_change=update_status, args=(i, f"s_{i}"))
+
+    with tab2: # المتأخرون
+        for i in range(30):
+            if group_data['parts'][i] != "تمت التلاوة":
+                st.radio(f"{group_data['readers'][i]} (الجزء {i+1})", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
+                         index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
+                         key=f"late_s_{i}", horizontal=True, on_change=update_status, args=(i, f"late_s_{i}"))
+    
+    with tab3: # التفاصيل
+        st.write("### أحدث 5 تحديثات للمتأخرين:")
+        updates = group_data.get("last_updates", {})
+        sorted_upd = sorted(updates.items(), key=lambda x: x[1]['timestamp'], reverse=True)[:5]
+        for idx, (part_idx, data) in enumerate(sorted_upd):
+            st.write(f"{idx+1}. {group_data['readers'][int(part_idx)]} - الجزء {int(part_idx)+1} - {data['time']}")
+
+else:
+    # لوحة التحكم المركزية
+    st.title("⚙️ لوحة التحكم المركزية")
+    if st.text_input("كلمة المرور:", type="password") == "admin":
+        tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
+        
+        with tab1:
             for g_id, g_info in db["groups"].items():
                 st.write(f"**{g_info['name']}**")
-                st.code(f"{BASE_URL}/?group={g_id}")
-    
-    with tab2:
-        g_name = st.text_input("اسم الختمة الجديدة:")
-        g_pass = st.text_input("كلمة مرور الختمة:")
-        if st.button("إنشاء الختمة"):
-            if g_name and g_pass:
+                # رابط مباشر للمجموعة
+                link = f"{BASE_URL}/?group={g_id}"
+                st.markdown(f"[{link}]({link})")
+        
+        with tab2:
+            name = st.text_input("اسم الختمة:")
+            pw = st.text_input("كلمة مرور الختمة:")
+            if st.button("إنشاء"):
                 g_id = "group_" + str(uuid.uuid4())[:8]
-                db["groups"][g_id] = {
-                    "name": g_name, 
-                    "password": g_pass, 
-                    "khatma_count": 0, 
-                    "parts": ["لم تبدأ"] * 30, 
-                    "readers": [f"قارئ {i+1}" for i in range(30)],
-                    "last_updates": {}
-                }
-                save_data(db)
-                st.success(f"تم إنشاء {g_name} بنجاح!")
-                st.rerun()
+                db["groups"][g_id] = {"name": name, "password": pw, "parts": ["لم تبدأ"]*30, "readers": [f"قارئ {i+1}" for i in range(30)], "last_updates": {}}
+                save_data(db); st.rerun()
 
-    with tab3:
-        if not db["groups"]:
-            st.info("لا توجد مجموعات.")
-        else:
-            # هنا التعديلات التي طلبتها
+        with tab3:
             e_id = st.selectbox("اختر المجموعة:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
             g_info = db["groups"][e_id]
-            
-            new_name = st.text_input("اسم الختمة:", value=g_info["name"])
-            new_count = st.number_input("الختمات المنجزة:", value=g_info.get("khatma_count", 0))
-            e_text = st.text_area("تعديل أسماء القراء (30 اسماً):", value="\n".join(g_info["readers"]), height=300)
-            
-            if st.button("حفظ التعديلات"):
-                readers = e_text.splitlines()
-                if len(readers) == 30:
-                    g_info.update({"name": new_name, "khatma_count": new_count, "readers": readers})
-                    save_data(db)
-                    st.success("تم التحديث!")
-                    st.rerun()
-                else: st.error("يجب أن يكون العدد 30.")
-
-    with tab4:
-        st.write("قسم المتابعة والتذكير...")
-
-elif admin_login != "":
-    st.error("كلمة المرور خاطئة!")
+            g_info["name"] = st.text_input("اسم الختمة:", value=g_info["name"])
+            e_text = st.text_area("الأسماء:", value="\n".join(g_info["readers"]), height=300)
+            if st.button("حفظ"):
+                g_info["readers"] = e_text.splitlines()
+                save_data(db); st.rerun()
