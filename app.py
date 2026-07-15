@@ -5,21 +5,23 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS المحدث =================
+# ================= CSS المحدث (محاذاة يمين) =================
 st.markdown("""
 <style>
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
     
-    /* الحاوية التي تغطي كامل الصف وتطبق التظليل */
+    /* الحاوية التي ترتب العناصر من اليمين لليسار */
     .row-wrapper { 
         display: flex; 
         flex-direction: row; 
         align-items: center; 
+        justify-content: flex-start;
         padding: 15px; 
         border-bottom: 1px solid #dcdcdc; 
         transition: background-color 0.3s;
+        gap: 20px;
     }
     .row-completed { background-color: #d4edda !important; } 
     
@@ -56,11 +58,10 @@ if current_group_id and current_group_id in db["groups"]:
     st.title(f"📖 {group_data['name']}")
 
     completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
-    khatma_val = group_data.get('khatma_count', 0)
     c1, c2, c3 = st.columns(3)
     c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
     c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='dashboard-card card-green'><h2>{khatma_val}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='dashboard-card card-green'><h2>{group_data.get('khatma_count', 0)}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
 
     def update_status(i, key):
         group_data['parts'][i] = st.session_state[key]
@@ -75,12 +76,12 @@ if current_group_id and current_group_id in db["groups"]:
             
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
             
-            # العناصر داخل الصف الواحد
+            # ترتيب العناصر: الجزء -> القارئ والمربعات -> الراديو
             level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
             squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
             
-            st.markdown(f"<div style='flex:1;'><span class='highlight-text'>الجزء {i+1}</span></div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='flex:2;'><span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='min-width:80px;'><span class='highlight-text'>الجزء {i+1}</span></div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='min-width:150px;'><span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}</div>", unsafe_allow_html=True)
             
             st.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                      index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
@@ -95,7 +96,7 @@ if current_group_id and current_group_id in db["groups"]:
                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
                          key=f"late_s_{i}", horizontal=True, on_change=update_status, args=(i, f"late_s_{i}"))
     with tab3:
-        st.write(f"إجمالي الختمات المنجزة: {khatma_val}")
+        st.write(f"إجمالي الختمات المنجزة: {group_data.get('khatma_count', 0)}")
 else:
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
