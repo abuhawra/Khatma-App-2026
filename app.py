@@ -13,14 +13,7 @@ st.markdown("""
     .highlight-text { font-weight: bold; color: #D32F2F; }
     .red-note { color: #D32F2F; font-weight: bold; margin-bottom: 15px; }
     
-    .row-wrapper { 
-        display: flex; 
-        flex-direction: row; 
-        align-items: center; 
-        padding: 15px; 
-        border-bottom: 1px solid #dcdcdc; 
-        transition: background-color 0.3s;
-    }
+    .row-wrapper { padding: 15px; border-bottom: 1px solid #dcdcdc; }
     .row-completed { background-color: #d4edda !important; } 
     
     .status-box { display: inline-block; width: 15px; height: 15px; margin-left: 3px; border-radius: 2px; }
@@ -33,31 +26,26 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ================= البيانات والمنطق =================
-# تصحيح مسارات الملفات هنا
+# ================= البيانات =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE_PATH = os.path.join(BASE_DIR, 'data.json')
 
 def load_data():
-    if not os.path.exists(DATA_FILE_PATH): 
-        return {"groups": {}, "base_url": ""}
+    if not os.path.exists(DATA_FILE_PATH): return {"groups": {}, "base_url": ""}
     try:
-        with open(DATA_FILE_PATH, 'r', encoding='utf-8') as f: 
-            return json.load(f)
-    except: 
-        return {"groups": {}, "base_url": ""}
+        with open(DATA_FILE_PATH, 'r', encoding='utf-8') as f: return json.load(f)
+    except: return {"groups": {}, "base_url": ""}
 
 def save_data(data):
-    with open(DATA_FILE_PATH, 'w', encoding='utf-8') as f: 
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    with open(DATA_FILE_PATH, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
 
 db = load_data()
 query_params = st.query_params
 current_group_id = query_params.get("group")
 
+# ================= المنطق =================
 if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
-    
     st.title(f"📖 {group_data['name']}")
     st.markdown("<p class='red-note'>تبدأ الختمة يوم الجمعة وتختم ليلة الجمعة</p>", unsafe_allow_html=True)
 
@@ -69,8 +57,9 @@ if current_group_id and current_group_id in db["groups"]:
     c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
     c3.markdown(f"<div class='dashboard-card card-green'><h2>{khatma_val}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
 
-    def update_status(i, key):
-        group_data['parts'][i] = st.session_state[key]
+    def update_status(i):
+        # الحالة الجديدة يتم جلبها من session_state بناءً على مفتاح فريد
+        group_data['parts'][i] = st.session_state[f"s_{i}"]
         save_data(db)
 
     tab1, tab2, tab3 = st.tabs(["📊 الجدول", "✅ تأكيد التلاوة", "📖 تفاصيل"])
@@ -79,17 +68,18 @@ if current_group_id and current_group_id in db["groups"]:
         for i in range(30):
             status = group_data['parts'][i]
             row_class = "row-wrapper row-completed" if status == "تمت التلاوة" else "row-wrapper"
-            
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
             
+            # مربعات التقدم
             level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
             squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
             
             st.markdown(f"<div><span class='highlight-text'>الجزء {i+1} - {group_data['readers'][i]}</span><br>{squares_html}</div>", unsafe_allow_html=True)
             
+            # زر الراديو مع ربط مباشر
             st.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                      index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
-                     key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
+                     key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i,))
             st.markdown('</div>', unsafe_allow_html=True)
 
     with tab2:
@@ -97,7 +87,7 @@ if current_group_id and current_group_id in db["groups"]:
             if group_data['parts'][i] != "تمت التلاوة":
                 st.radio(f"{group_data['readers'][i]} (الجزء {i+1})", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
-                         key=f"late_s_{i}", horizontal=True, on_change=update_status, args=(i, f"late_s_{i}"))
+                         key=f"late_s_{i}", horizontal=True, on_change=lambda idx=i: [group_data['parts'].__setitem__(idx, st.session_state[f"late_s_{idx}"]), save_data(db)])
     with tab3:
         st.write(f"إجمالي الختمات المنجزة: {khatma_val}")
 else:
@@ -111,7 +101,7 @@ else:
             for g_id, g_info in db["groups"].items():
                 st.write(f"**{g_info['name']}**"); st.code(f"{base_url}/?group={g_id}")
         with tab2:
-            name = st.text_input("اسم الختمة:"); 
+            name = st.text_input("اسم الختمة:")
             if st.button("إنشاء"):
                 g_id = "group_" + str(uuid.uuid4())[:8]
                 db["groups"][g_id] = {"name": name, "parts": ["لم تبدأ"]*30, "readers": [f"قارئ {i+1}" for i in range(30)], "khatma_count": 0}
