@@ -7,7 +7,7 @@ import urllib.parse
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
 # ==========================================
-# كود التصميم (CSS) للغة العربية 
+# كود التصميم (CSS) للغة العربية وتنسيق الأزرار
 # ==========================================
 st.markdown("""
 <style>
@@ -16,6 +16,8 @@ st.markdown("""
     .stApp { direction: rtl; }
     p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea { text-align: right !important; }
     [data-testid="column"] { direction: rtl; }
+    
+    /* تنسيق بطاقات الإحصائيات العلوية */
     .dashboard-card { border-radius: 12px; padding: 20px 10px; color: white; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .dashboard-card h2 { margin: 10px 0 5px 0 !important; font-size: 2.2rem !important; font-weight: 700 !important; color: white !important; text-align: center !important;}
     .dashboard-card p { margin: 0 !important; font-size: 1rem !important; opacity: 0.9 !important; text-align: center !important;}
@@ -28,6 +30,13 @@ st.markdown("""
     .stats-text { color: #555; font-size: 0.95rem; font-weight: bold; }
     .stats-row { display: flex; justify-content: space-between; margin-top: 15px; margin-bottom: 5px; direction: rtl; }
     .dashboard-card * { text-align: center !important; }
+
+    /* تحسين مظهر أزرار الخيارات الأفقية لتبدو كأزرار حقيقية متناسقة */
+    div[data-testid="stMarkdownContainer"] > p { margin-bottom: 0px; }
+    div[data-testid="stWidgetLabel"] { display: none; }
+    div[role="radiogroup"] {
+        gap: 10px;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -104,7 +113,8 @@ if "group" in query_params and query_params["group"] in db["groups"]:
 
     with tab_overview:
         for i in range(30):
-            col1, col2, col3, col4 = st.columns([1, 1.5, 1.5, 1])
+            # تم تعديل نسب الأعمدة لإعطاء مساحة كافية لأزرار الخيارات الأفقية
+            col1, col2, col3, col4 = st.columns([1, 2, 5.5, 1])
             with col1: st.write(f"**الجزء {i+1}**")
             
             current_status = sanitize_status(group_data['parts'][i])
@@ -121,8 +131,16 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 else:
                     st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
                 
+            # استبدال القائمة المنسدلة بأزرار خيارات أفقية (Radio Buttons)
             with col3:
-                selected = st.selectbox("الحالة", STATUS_OPTIONS, index=STATUS_OPTIONS.index(current_status), key=f"s_{i}", label_visibility="collapsed")
+                selected = st.radio(
+                    f"الحالة_{i}", 
+                    STATUS_OPTIONS, 
+                    index=STATUS_OPTIONS.index(current_status), 
+                    key=f"s_{i}", 
+                    horizontal=True,
+                    label_visibility="collapsed"
+                )
                 if selected != current_status:
                     group_data['parts'][i] = selected
                     save_data(db)
@@ -141,7 +159,8 @@ if "group" in query_params and query_params["group"] in db["groups"]:
             if st.button("إغلاق الختمة"):
                 if pwd == group_data["password"]:
                     group_data["khatma_count"] = group_data.get("khatma_count", 0) + 1
-                    group_data["readers"] = [group_data["readers"][-1]] + group_data["readers"][:-1] 
+                    readers = group_data["readers"]
+                    group_data["readers"] = [readers[-1]] + readers[:-1] 
                     group_data["parts"] = ["لم تبدأ"] * 30 
                     save_data(db)
                     st.success("تم إغلاق الختمة وترحيل الأسماء!")
