@@ -7,7 +7,7 @@ import urllib.parse
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
 # ==========================================
-# كود التصميم (CSS) للغة العربية وتنسيق الأزرار والصفوف
+# كود التصميم (CSS) 
 # ==========================================
 st.markdown("""
 <style>
@@ -17,7 +17,6 @@ st.markdown("""
     p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea { text-align: right !important; }
     [data-testid="column"] { direction: rtl; }
     
-    /* تنسيق بطاقات الإحصائيات العلوية */
     .dashboard-card { border-radius: 12px; padding: 20px 10px; color: white; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; }
     .dashboard-card h2 { margin: 10px 0 5px 0 !important; font-size: 2.2rem !important; font-weight: 700 !important; color: white !important; text-align: center !important;}
     .dashboard-card p { margin: 0 !important; font-size: 1rem !important; opacity: 0.9 !important; text-align: center !important;}
@@ -31,12 +30,10 @@ st.markdown("""
     .stats-row { display: flex; justify-content: space-between; margin-top: 15px; margin-bottom: 5px; direction: rtl; }
     .dashboard-card * { text-align: center !important; }
 
-    /* تحسين مظهر أزرار الخيارات الأفقية لتبدو كأزرار حقيقية متناسقة */
     div[data-testid="stMarkdownContainer"] > p { margin-bottom: 0px; }
     div[data-testid="stWidgetLabel"] { display: none; }
     div[role="radiogroup"] { gap: 10px; }
     
-    /* تظليل الصفوف المتبادلة (Zebra Striping) */
     div[data-testid="stHorizontalBlock"]:has(.gray-bg) {
         background-color: rgba(130, 130, 130, 0.08); 
         padding-top: 10px;
@@ -65,7 +62,6 @@ def save_data(data):
     with open('data.json', 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
-# تحويل وتنظيف حالات القراءة القديمة
 def sanitize_status(status):
     if status is True or status == "تمت القراءة":
         return "تمت التلاوة"
@@ -118,29 +114,33 @@ if "group" in query_params and query_params["group"] in db["groups"]:
 
     tab_overview, tab_mark, tab_details, tab_schedule = st.tabs(["📊 الجدول", "✅ تأكيد التلاوة", "📖 تفاصيل", "📅 الخطة"])
 
-    # --- القسم الأول: الجدول العام (يعرض الـ 30 جزءاً بالكامل وينعكس فيه أي تغيير) ---
     with tab_overview:
         for i in range(30):
             col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
-            
-            with col1:
-                if i % 2 == 0:
-                    st.markdown(f'<span class="gray-bg"></span>**الجزء {i+1}**', unsafe_allow_html=True)
-                else:
-                    st.write(f"**الجزء {i+1}**")
-            
             current_status = sanitize_status(group_data['parts'][i])
             
-            with col2: 
-                st.write(f"**{group_data['readers'][i]}**")
+            # إعداد خلفية التظليل
+            bg_span = '<span class="gray-bg"></span>' if i % 2 == 0 else ''
+            
+            # عمود رقم الجزء (مع الشطب إذا اكتمل)
+            with col1:
                 if current_status == "تمت التلاوة":
-                    st.markdown("<small style='color: #277953; font-weight: bold;'>● تمت التلاوة</small>", unsafe_allow_html=True)
-                elif current_status == "حزب ونص":
-                    st.markdown("<small style='color: #d4a32a; font-weight: bold;'>● حزب ونص</small>", unsafe_allow_html=True)
-                elif current_status in ["حزب", "نص جزء"]:
-                    st.markdown(f"<small style='color: #a47e1b; font-weight: bold;'>● {current_status}</small>", unsafe_allow_html=True)
+                    st.markdown(f"{bg_span}<s style='color: #aaa;'>الجزء {i+1}</s>", unsafe_allow_html=True)
                 else:
-                    st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
+                    st.markdown(f"{bg_span}**الجزء {i+1}**", unsafe_allow_html=True)
+            
+            # عمود اسم القارئ وحالته (مع الشطب إذا اكتمل)
+            with col2: 
+                if current_status == "تمت التلاوة":
+                    st.markdown(f"<s style='color: #aaa;'>{group_data['readers'][i]}</s><br><small style='color: #277953; font-weight: bold;'>● تمت التلاوة</small>", unsafe_allow_html=True)
+                else:
+                    st.markdown(f"**{group_data['readers'][i]}**", unsafe_allow_html=True)
+                    if current_status == "حزب ونص":
+                        st.markdown("<small style='color: #d4a32a; font-weight: bold;'>● حزب ونص</small>", unsafe_allow_html=True)
+                    elif current_status in ["حزب", "نص جزء"]:
+                        st.markdown(f"<small style='color: #a47e1b; font-weight: bold;'>● {current_status}</small>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
                 
             with col3:
                 selected = st.radio(
@@ -154,7 +154,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 if selected != current_status:
                     group_data['parts'][i] = selected
                     save_data(db)
-                    st.rerun() # التحديث الفوري ينعكس على كلا القسمين
+                    st.rerun()
                     
             with col4:
                 if current_status == "تمت التلاوة":
@@ -177,21 +177,16 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 else:
                     st.error("الرقم السري خاطئ!")
 
-    # --- القسم الثاني: تأكيد التلاوة (تفاعل مباشر: يعرض المتأخرين فقط، ويشطب من يختار "تمت التلاوة") ---
     with tab_mark:
-        st.write("### ⏳ القراء الذين لم يكملوا التلاوة فقط")
-        st.caption("تنبيه: عند اختيار «تمت التلاوة» سيتم حفظ الإنجاز، ونقل الجزء إلى قائمة المكتملين في الجدول، وشطبه تلقائياً من هذه القائمة.")
-        
+        st.write("### ⏳ القراء الذين لم يكملوا التلاوة")
         has_incomplete = False
         display_counter = 0 
         
         for i in range(30):
             current_status = sanitize_status(group_data['parts'][i])
             
-            # الفلترة الحية: يتم استبعاد من أتم التلاوة (شطبه من هذا التبويب)
             if current_status != "تمت التلاوة":
                 has_incomplete = True
-                
                 col1_m, col2_m, col3_m = st.columns([1, 2, 7])
                 
                 with col1_m:
@@ -218,16 +213,16 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                         horizontal=True,
                         label_visibility="collapsed"
                     )
+                    # التفاعل اللحظي: بمجرد اختيار "تمت التلاوة" سيتم حفظها وتحديث الصفحة لتختفي من هنا وتُشطب في الجدول
                     if selected_mark != current_status:
                         group_data['parts'][i] = selected_mark
                         save_data(db)
-                        # بمجرد تغيير الحالة هنا إلى "تمت التلاوة"، يتم إعادة تحميل الصفحة وإخفاء البطاقة فوراً
                         st.rerun()
                 
                 display_counter += 1
                 
         if not has_incomplete:
-            st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم وتم نقل جميع الأجزاء إلى قائمة المنجزين في الجدول الرئيسي.")
+            st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم بنجاح.")
 
     with tab_details: st.info("قريباً.")
     with tab_schedule: st.info("قريباً.")
