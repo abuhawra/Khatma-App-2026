@@ -5,12 +5,13 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS المعدل =================
+# ================= CSS المحدث =================
 st.markdown("""
 <style>
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
+    /* تنسيق الصفوف - التغيير هنا لتغطية الخلفية بالكامل */
     .row-style { padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; transition: background-color 0.3s; }
     .row-completed { background-color: #d4edda !important; } 
     .status-box { display: inline-block; width: 15px; height: 15px; margin-left: 3px; border-radius: 2px; }
@@ -26,8 +27,7 @@ DATA_FILE = os.path.join(BASE_DIR, 'data.json')
 def load_data():
     if not os.path.exists(DATA_FILE): return {"groups": {}, "base_url": ""}
     try:
-        with open(DATA_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        with open(DATA_FILE, 'r', encoding='utf-8') as f: return json.load(f)
     except: return {"groups": {}, "base_url": ""}
 
 def save_data(data):
@@ -51,20 +51,21 @@ if current_group_id and current_group_id in db["groups"]:
     
     with tab1:
         for i in range(30):
-            current_status = group_data['parts'][i]
-            # منطق الألوان للمربعات
-            level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(current_status, 0)
-            squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
-            
-            row_class = "row-style row-completed" if current_status == "تمت التلاوة" else "row-style"
+            status = group_data['parts'][i]
+            # تحديد كلاس الخلفية
+            row_class = "row-style row-completed" if status == "تمت التلاوة" else "row-style"
             
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
             cols = st.columns([2, 3, 5])
+            
+            level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
+            squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
+            
             cols[0].markdown(f"<span class='highlight-text'>الجزء {i+1}</span>", unsafe_allow_html=True)
             cols[1].markdown(f"<span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}", unsafe_allow_html=True)
             
             cols[2].radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
-                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(current_status),
+                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
                           key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
             st.markdown('</div>', unsafe_allow_html=True)
 
