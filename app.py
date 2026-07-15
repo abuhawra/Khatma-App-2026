@@ -88,7 +88,6 @@ def render_status_label(status, name, strike=False):
         
     return f"<div style='line-height: 1.4;'>{name_html}<br>{sub}</div>"
 
-# دالة لتوليد النص التفاعلي لرسائل الواتساب
 def get_wa_status_text(status):
     if status == "حزب ونص": return " 🟩🟩🟩⬜ (حزب ونص)"
     elif status == "حزب": return " 🟩🟩⬜⬜ (حزب)"
@@ -107,7 +106,17 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     group_id = query_params["group"]
     group_data = db["groups"][group_id]
     
-    # حساب الإنجاز الذكي ليتفاعل مع الأجزاء (نص، حزب...) ويزيد الشريط بمرونة
+    # دالة المزامنة الفورية بين التبويبات (تُستدعى تلقائياً عند تغيير أي خيار)
+    def update_part_status(part_index, source_key):
+        new_status = st.session_state[source_key]
+        group_data['parts'][part_index] = new_status
+        save_data(db)
+        
+        # مزامنة الزر الموجود في التبويب الآخر لكي لا يعلق على قيمته القديمة
+        other_key = f"late_s_{part_index}" if source_key.startswith("s_") else f"s_{part_index}"
+        if other_key in st.session_state:
+            st.session_state[other_key] = new_status
+    
     progress_weights = {
         "لم تبدأ": 0.0,
         "نص جزء": 0.25,
@@ -153,22 +162,20 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     st.markdown(f"{bg_span}**الجزء {i+1}**", unsafe_allow_html=True)
             
             with col2: 
-                # استدعاء دالة العرض التفاعلية
                 st.markdown(render_status_label(current_status, group_data['readers'][i], strike=True), unsafe_allow_html=True)
                 
             with col3:
-                selected = st.radio(
+                # استخدام on_change للمزامنة الفورية
+                st.radio(
                     f"الحالة_{i}", 
                     STATUS_OPTIONS, 
                     index=STATUS_OPTIONS.index(current_status), 
                     key=f"s_{i}", 
                     horizontal=True,
-                    label_visibility="collapsed"
+                    label_visibility="collapsed",
+                    on_change=update_part_status,
+                    args=(i, f"s_{i}")
                 )
-                if selected != current_status:
-                    group_data['parts'][i] = selected
-                    save_data(db)
-                    st.rerun()
                     
             with col4:
                 if current_status == "تمت التلاوة":
@@ -213,18 +220,17 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     st.markdown(render_status_label(current_status, group_data['readers'][i], strike=False), unsafe_allow_html=True)
                 
                 with col3_m:
-                    selected_mark = st.radio(
+                    # استخدام on_change للمزامنة الفورية مع الجدول الرئيسي
+                    st.radio(
                         f"الحالة_متأخر_{i}", 
                         STATUS_OPTIONS, 
                         index=STATUS_OPTIONS.index(current_status), 
                         key=f"late_s_{i}", 
                         horizontal=True,
-                        label_visibility="collapsed"
+                        label_visibility="collapsed",
+                        on_change=update_part_status,
+                        args=(i, f"late_s_{i}")
                     )
-                    if selected_mark != current_status:
-                        group_data['parts'][i] = selected_mark
-                        save_data(db)
-                        st.rerun()
                 
                 display_counter += 1
                 
@@ -320,7 +326,6 @@ else:
                 for i in range(30):
                     p_status = sanitize_status(w_info['parts'][i])
                     if p_status != "تمت التلاوة": 
-                        # إضافة التفاعل المرئي (شريط المربعات) لرسالة الواتساب
                         status_note = get_wa_status_text(p_status)
                         msg.append(f"الجزء {i+1} : {w_info['readers'][i]}{status_note}")
                 
