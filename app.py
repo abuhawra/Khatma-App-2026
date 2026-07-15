@@ -5,18 +5,21 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS المحدث =================
+# ================= CSS المعدل =================
 st.markdown("""
 <style>
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
-    /* تنسيق الصفوف - التغيير هنا لتغطية الخلفية بالكامل */
+    /* تنسيق الصفوف - الخلفية الخضراء تغطي الصف بالكامل */
     .row-style { padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; transition: background-color 0.3s; }
     .row-completed { background-color: #d4edda !important; } 
     .status-box { display: inline-block; width: 15px; height: 15px; margin-left: 3px; border-radius: 2px; }
     .s-green { background-color: #277953; }
     .s-gray { background-color: #e0e0e0; }
+    .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
+    .card-green { background-color: #277953; }
+    .card-yellow { background-color: #d4a32a; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -42,17 +45,23 @@ if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
 
+    # الإحصائيات
+    completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
+    khatma_val = group_data.get('khatma_count', 0)
+    c1, c2, c3 = st.columns(3)
+    c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
+    c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='dashboard-card card-green'><h2>{khatma_val}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
+
     def update_status(i, key):
         group_data['parts'][i] = st.session_state[key]
         save_data(db)
-        st.rerun()
 
     tab1, tab2, tab3 = st.tabs(["📊 الجدول", "✅ تأكيد التلاوة", "📖 تفاصيل"])
     
     with tab1:
         for i in range(30):
             status = group_data['parts'][i]
-            # تحديد كلاس الخلفية
             row_class = "row-style row-completed" if status == "تمت التلاوة" else "row-style"
             
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
@@ -76,11 +85,12 @@ if current_group_id and current_group_id in db["groups"]:
                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
                          key=f"late_s_{i}", horizontal=True, on_change=update_status, args=(i, f"late_s_{i}"))
     with tab3:
-        st.write(f"إجمالي الختمات المنجزة: {group_data.get('khatma_count', 0)}")
+        st.write(f"إجمالي الختمات المنجزة: {khatma_val}")
 
 else:
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
+        # ... (باقي كود لوحة التحكم)
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
         with tab1:
             base_url = st.text_input("رابط الموقع الأساسي", db.get("base_url", ""))
