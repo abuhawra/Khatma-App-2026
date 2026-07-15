@@ -5,24 +5,21 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS المعدل (محاذاة يمين كاملة) =================
+# ================= CSS النهائي (محاذاة يمين قسرية) =================
 st.markdown("""
 <style>
-    /* فرض الاتجاه من اليمين لليسار */
-    html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
+    /* فرض الاتجاه العربي */
+    html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; }
     .stApp { direction: rtl !important; }
+    
     .highlight-text { font-weight: bold; color: #D32F2F; }
     
-    /* حاوية الصف - ترتيب العناصر من اليمين لليسار */
+    /* حاوية الصف - استخدام block لضمان الترتيب من اليمين */
     .row-wrapper { 
-        display: flex; 
-        flex-direction: row; 
-        align-items: center; 
-        justify-content: flex-start; 
         padding: 15px; 
         border-bottom: 1px solid #dcdcdc; 
         transition: background-color 0.3s;
-        gap: 20px;
+        text-align: right; /* محاذاة للنص */
     }
     .row-completed { background-color: #d4edda !important; } 
     
@@ -30,16 +27,12 @@ st.markdown("""
     .s-green { background-color: #277953; }
     .s-gray { background-color: #e0e0e0; }
     
-    /* ضبط محاذاة أزرار الراديو */
-    div.stRadio > div { flex-direction: row-reverse; justify-content: flex-start; gap: 10px; }
-    
-    .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
-    .card-green { background-color: #277953; }
-    .card-yellow { background-color: #d4a32a; }
+    /* ضمان أزرار الحالة في جهة اليمين */
+    div.stRadio > label { text-align: right !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= البيانات =================
+# ================= البيانات والمنطق (كما هو) =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, 'data.json')
 
@@ -56,17 +49,9 @@ db = load_data()
 query_params = st.query_params
 current_group_id = query_params.get("group")
 
-# ================= المنطق =================
 if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
-
-    completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
-    khatma_val = group_data.get('khatma_count', 0)
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='dashboard-card card-green'><h2>{khatma_val}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
 
     def update_status(i, key):
         group_data['parts'][i] = st.session_state[key]
@@ -81,14 +66,17 @@ if current_group_id and current_group_id in db["groups"]:
             
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
             
-            # ترتيب يمين -> يسار
+            # عرض البيانات بوضوح جهة اليمين
             level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
             squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
             
-            # البيانات جهة اليمين
-            st.markdown(f"<div style='flex:1;'><span class='highlight-text'>الجزء {i+1} - {group_data['readers'][i]}</span><br>{squares_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"""
+                <div>
+                    <span class='highlight-text'>الجزء {i+1} - {group_data['readers'][i]}</span>
+                    <br>{squares_html}
+                </div>
+            """, unsafe_allow_html=True)
             
-            # الأزرار (تظهر بعد البيانات)
             st.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                      index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
                      key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
@@ -102,9 +90,9 @@ if current_group_id and current_group_id in db["groups"]:
                          index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
                          key=f"late_s_{i}", horizontal=True, on_change=update_status, args=(i, f"late_s_{i}"))
     with tab3:
-        st.write(f"إجمالي الختمات المنجزة: {khatma_val}")
+        st.write(f"إجمالي الختمات المنجزة: {group_data.get('khatma_count', 0)}")
 else:
-    # لوحة التحكم المركزية
+    # (لوحة التحكم المركزية)
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
