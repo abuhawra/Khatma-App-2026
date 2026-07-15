@@ -92,7 +92,7 @@ def get_wa_status_text(status):
     if status == "حزب ونص": return " 🟩🟩🟩⬜ (حزب ونص)"
     elif status == "حزب": return " 🟩🟩⬜⬜ (حزب)"
     elif status == "نص جزء": return " 🟩⬜⬜⬜ (نص جزء)"
-    elif status == "لم تبدأ": return " ⬜⬜⬜⬜ (لم يبدأ)"
+    elif status == "لم تبدأ": return " ⬜⬜⬜⬜ (لم تبدأ)"
     return ""
 
 db = load_data()
@@ -202,8 +202,14 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     group_data["readers"] = [readers[-1]] + readers[:-1] 
                     group_data["parts"] = ["لم تبدأ"] * 30 
                     group_data["last_updates"] = {} 
+                    
+                    # تنظيف الذاكرة المؤقتة لكي تعود جميع الأزرار للوضع الافتراضي بصرياً وبرمجياً
+                    keys_to_delete = [k for k in st.session_state.keys() if k.startswith("s_") or k.startswith("late_s_")]
+                    for key in keys_to_delete:
+                        del st.session_state[key]
+                        
                     save_data(db)
-                    st.success("تم إغلاق الختمة وترحيل الأسماء!")
+                    st.success("تم إغلاق الختمة وترحيل الأسماء وتهيئة الأجزاء بنجاح!")
                     st.rerun()
                 else:
                     st.error("الرقم السري خاطئ!")
@@ -351,7 +357,6 @@ else:
                 w_id = st.selectbox("اختر المجموعة لمتابعة تقدم قرائها وتذكيرهم:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
                 w_info = db["groups"][w_id]
                 
-                # طبقة الحماية الجديدة: طلب كلمة مرور المجموعة لفتح القسم
                 st.write("---")
                 group_pass_input = st.text_input(f"🔒 يرجى إدخال كلمة مرور مجموعة ({w_info['name']}) لعرض التفاصيل وإرسال التذكيرات:", type="password", key=f"pass_check_{w_id}")
                 
