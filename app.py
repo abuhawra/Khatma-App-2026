@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import uuid
 import urllib.parse 
+import datetime # مكتبة التاريخ والوقت المضافة
 
 # إعدادات الصفحة
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
@@ -106,13 +107,35 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     group_id = query_params["group"]
     group_data = db["groups"][group_id]
     
-    # دالة المزامنة الفورية بين التبويبات (تُستدعى تلقائياً عند تغيير أي خيار)
+    # دالة التحديث المزامنة الذكية التي تسجل المنجزين للوحة التفاصيل مع الوقت والتاريخ
     def update_part_status(part_index, source_key):
         new_status = st.session_state[source_key]
+        old_status = group_data['parts'][part_index]
+        
+        # التأكد من وجود سجل الإنجاز
+        if "completion_history" not in group_data:
+            group_data["completion_history"] = []
+            
+        # إضافة القارئ لسجل الشرف مع تسجيل الوقت والتاريخ الحاليين بدقة
+        if new_status == "تمت التلاوة" and old_status != "تمت التلاوة":
+            # التقاط الوقت الحالي وتنسيقه (السنة-الشهر-اليوم  الساعة:الدقيقة ص/م)
+            now_time = datetime.datetime.now().strftime("%Y-%m-%d  %I:%M %p")
+            
+            # إزالة إذا كان الجزء مكرراً سابقاً للتحديث
+            group_data["completion_history"] = [x for x in group_data["completion_history"] if x['part'] != (part_index + 1)]
+            group_data["completion_history"].append({
+                "reader": group_data['readers'][part_index], 
+                "part": part_index + 1,
+                "time": now_time
+            })
+            
+        # إزالة القارئ من سجل الشرف إذا تراجع مشرف الختمة أو القارئ عن الإتمام
+        elif new_status != "تمت التلاوة" and old_status == "تمت التلاوة":
+            group_data["completion_history"] = [x for x in group_data["completion_history"] if x['part'] != (part_index + 1)]
+
         group_data['parts'][part_index] = new_status
         save_data(db)
         
-        # مزامنة الزر الموجود في التبويب الآخر لكي لا يعلق على قيمته القديمة
         other_key = f"late_s_{part_index}" if source_key.startswith("s_") else f"s_{part_index}"
         if other_key in st.session_state:
             st.session_state[other_key] = new_status
@@ -165,7 +188,6 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 st.markdown(render_status_label(current_status, group_data['readers'][i], strike=True), unsafe_allow_html=True)
                 
             with col3:
-                # استخدام on_change للمزامنة الفورية
                 st.radio(
                     f"الحالة_{i}", 
                     STATUS_OPTIONS, 
@@ -192,6 +214,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     readers = group_data["readers"]
                     group_data["readers"] = [readers[-1]] + readers[:-1] 
                     group_data["parts"] = ["لم تبدأ"] * 30 
+                    group_data["completion_history"] = [] # تفريغ السجل للختمة الجديدة
                     save_data(db)
                     st.success("تم إغلاق الختمة وترحيل الأسماء!")
                     st.rerun()
@@ -220,7 +243,6 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     st.markdown(render_status_label(current_status, group_data['readers'][i], strike=False), unsafe_allow_html=True)
                 
                 with col3_m:
-                    # استخدام on_change للمزامنة الفورية مع الجدول الرئيسي
                     st.radio(
                         f"الحالة_متأخر_{i}", 
                         STATUS_OPTIONS, 
@@ -237,7 +259,33 @@ if "group" in query_params and query_params["group"] in db["groups"]:
         if not has_incomplete:
             st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم بنجاح.")
 
-    with tab_details: st.info("قريباً.")
+    # ================= التبويب المطور (أحدث المنجزين مع الوقت والتاريخ) =================
+    with tab_details: 
+        st.write("### 🏆 أحدث القراء إنجازاً للتلاوة")
+        history = group_data.get("completion_history", [])
+        
+        if not history:
+            st.info("لم يقم أحد بإتمام التلاوة حتى الآن. بانتظار المبادر الأول!")
+        else:
+            # جلب آخر 5 أشخاص وعكس الترتيب ليظهر الأحدث أولاً
+            last_5 = history[-5:][::-1]
+            
+            for idx, item in enumerate(last_5):
+                # جلب تاريخ ووقت الإنجاز أو وضع "غير مسجل" إذا لم يتوفر بعد
+                time_str = item.get('time', 'غير مسجل')
+                
+                st.markdown(f"""
+                <div style='padding: 12px 15px; background-color: rgba(130, 130, 130, 0.08); border-radius: 8px; margin-bottom: 10px; border-right: 4px solid #277953; display: flex; justify-content: space-between; align-items: center;'>
+                    <div>
+                        <span style='font-size: 1.1rem; font-weight: bold;'>{idx + 1}. {item['reader']}</span> 
+                        <span style='color: #277953; font-weight: bold; margin-right: 15px;'>(الجزء {item['part']})</span>
+                    </div>
+                    <div style='color: #888; font-size: 0.9rem;'>
+                        📅 {time_str}
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+                
     with tab_schedule: st.info("قريباً.")
 
 # ==========================================
@@ -274,7 +322,7 @@ else:
                 if not g_name or not g_pass: st.error("أكمل البيانات")
                 elif len(r_list) != 30: st.error(f"يجب إدخال 30 اسم (أدخلت {len(r_list)})")
                 else:
-                    db["groups"]["group_" + str(uuid.uuid4())[:8]] = {"name": g_name, "password": g_pass, "khatma_count": 0, "parts": ["لم تبدأ"] * 30, "readers": r_list}
+                    db["groups"]["group_" + str(uuid.uuid4())[:8]] = {"name": g_name, "password": g_pass, "khatma_count": 0, "parts": ["لم تبدأ"] * 30, "readers": r_list, "completion_history": []}
                     save_data(db)
                     st.success("تم!")
                     st.rerun()
