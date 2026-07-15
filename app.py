@@ -23,7 +23,13 @@ DATA_FILE = os.path.join(BASE_DIR, 'data.json')
 
 def load_data():
     if not os.path.exists(DATA_FILE): return {"groups": {}, "base_url": ""}
-    with open(DATA_FILE, 'r', encoding='utf-8') as f: return json.load(f)
+    with open(DATA_FILE, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        # إصلاح المجموعات القديمة: التأكد من وجود "khatma_count"
+        for g_id in data.get("groups", {}):
+            if "khatma_count" not in data["groups"][g_id]:
+                data["groups"][g_id]["khatma_count"] = 0
+        return data
 
 def save_data(data):
     with open(DATA_FILE, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
@@ -37,14 +43,18 @@ if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
 
-    # الإحصائيات
-    completed = sum(1 for p in group_data['parts'] if p == "تمت التلاوة")
+    # معالجة القيمة لضمان عدم ظهور None
+    completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
+    khatma_val = group_data.get('khatma_count', 0)
+    if khatma_val is None: khatma_val = 0
+
     c1, c2, c3 = st.columns(3)
     c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
     c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='dashboard-card card-green'><h2>{group_data.get('khatma_count', 0)}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
+    c3.markdown(f"<div class='dashboard-card card-green'><h2>{khatma_val}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
     st.progress(completed / 30)
 
+    # (باقي الكود كما هو...)
     def update_status(i, key):
         group_data['parts'][i] = st.session_state[key]
         save_data(db)
@@ -69,13 +79,13 @@ if current_group_id and current_group_id in db["groups"]:
                          key=f"late_s_{i}", horizontal=True, on_change=update_status, args=(i, f"late_s_{i}"))
 
 else:
-    # لوحة التحكم
+    # لوحة التحكم المركزية
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
         with tab1:
             for g_id, g_info in db["groups"].items():
-                st.write(f"**{g_info['name']}**"); st.code(f"{BASE_URL}/?group={g_id}")
+                st.write(f"**{g_info['name']}**"); st.code(f"/?group={g_id}")
         with tab2:
             name = st.text_input("اسم الختمة:")
             if st.button("إنشاء"):
@@ -86,7 +96,7 @@ else:
             e_id = st.selectbox("المجموعة:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
             g_info = db["groups"][e_id]
             g_info["name"] = st.text_input("الاسم:", value=g_info["name"])
-            g_info["khatma_count"] = st.number_input("الختمات المنجزة:", value=g_info.get("khatma_count", 0))
+            g_info["khatma_count"] = st.number_input("الختمات المنجزة:", value=int(g_info.get("khatma_count", 0) or 0))
             e_text = st.text_area("الأسماء:", value="\n".join(g_info["readers"]), height=300)
             if st.button("حفظ"):
                 g_info["readers"] = e_text.splitlines(); save_data(db); st.rerun()
