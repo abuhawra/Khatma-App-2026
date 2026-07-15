@@ -5,19 +5,19 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS المحدث (محاذاة يمين) =================
+# ================= CSS المحدث (محاذاة يمين دقيقة) =================
 st.markdown("""
 <style>
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
     
-    /* الحاوية التي ترتب العناصر من اليمين لليسار */
+    /* الحاوية الرئيسية: مرتبة من اليمين لليسار */
     .row-wrapper { 
         display: flex; 
-        flex-direction: row; 
+        flex-direction: row-reverse; /* عكس الترتيب لتبدأ من اليمين */
         align-items: center; 
-        justify-content: flex-start;
+        justify-content: flex-end; /* دفع العناصر لجهة اليمين */
         padding: 15px; 
         border-bottom: 1px solid #dcdcdc; 
         transition: background-color 0.3s;
@@ -28,14 +28,10 @@ st.markdown("""
     .status-box { display: inline-block; width: 15px; height: 15px; margin-left: 3px; border-radius: 2px; }
     .s-green { background-color: #277953; }
     .s-gray { background-color: #e0e0e0; }
-    
-    .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
-    .card-green { background-color: #277953; }
-    .card-yellow { background-color: #d4a32a; }
 </style>
 """, unsafe_allow_html=True)
 
-# ================= البيانات =================
+# ================= البيانات والمنطق (كما هو) =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, 'data.json')
 
@@ -52,16 +48,9 @@ db = load_data()
 query_params = st.query_params
 current_group_id = query_params.get("group")
 
-# ================= المنطق =================
 if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
-
-    completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='dashboard-card card-green'><h2>{group_data.get('khatma_count', 0)}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
 
     def update_status(i, key):
         group_data['parts'][i] = st.session_state[key]
@@ -76,16 +65,17 @@ if current_group_id and current_group_id in db["groups"]:
             
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
             
-            # ترتيب العناصر: الجزء -> القارئ والمربعات -> الراديو
+            # عرض العناصر (مرتبة من اليمين لليسار في الكود)
             level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
             squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
             
-            st.markdown(f"<div style='min-width:80px;'><span class='highlight-text'>الجزء {i+1}</span></div>", unsafe_allow_html=True)
-            st.markdown(f"<div style='min-width:150px;'><span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}</div>", unsafe_allow_html=True)
-            
+            # أزرار الراديو تأتي أولاً (في اليمين بسبب flex-direction: row-reverse)
             st.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                      index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
                      key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
+            
+            st.markdown(f"<div style='min-width:150px;'><span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}</div>", unsafe_allow_html=True)
+            st.markdown(f"<div style='min-width:80px;'><span class='highlight-text'>الجزء {i+1}</span></div>", unsafe_allow_html=True)
             
             st.markdown('</div>', unsafe_allow_html=True)
 
@@ -98,6 +88,7 @@ if current_group_id and current_group_id in db["groups"]:
     with tab3:
         st.write(f"إجمالي الختمات المنجزة: {group_data.get('khatma_count', 0)}")
 else:
+    # لوحة التحكم المركزية (نفس الكود السابق)
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
