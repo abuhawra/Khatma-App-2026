@@ -13,11 +13,11 @@ st.markdown("""
     .stApp { direction: rtl !important; }
     p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea, button { text-align: right !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
-    /* تم حذف كلاس row-shaded و row-normal */
-    .row-style { padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; }
-    .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
-    .card-green { background-color: #277953; }
-    .card-yellow { background-color: #d4a32a; }
+    .row-style { padding: 10px; border-bottom: 1px solid #dcdcdc; }
+    /* تنسيق مربعات الحالة */
+    .status-box { display: inline-block; width: 15px; height: 15px; margin-left: 3px; border-radius: 2px; }
+    .s-green { background-color: #277953; }
+    .s-gray { background-color: #e0e0e0; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -36,6 +36,16 @@ def load_data():
 def save_data(data):
     with open(DATA_FILE, 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
 
+# دالة رسم مربعات التقدم
+def get_status_squares(status):
+    mapping = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}
+    level = mapping.get(status, 0)
+    squares = ""
+    for i in range(4):
+        color = "s-green" if i < level else "s-gray"
+        squares += f'<div class="status-box {color}"></div>'
+    return squares
+
 db = load_data()
 query_params = st.query_params
 current_group_id = query_params.get("group")
@@ -44,13 +54,6 @@ current_group_id = query_params.get("group")
 if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
-
-    completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
-    c1, c2, c3 = st.columns(3)
-    c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
-    c2.markdown(f"<div class='dashboard-card card-yellow'><h2>{30 - completed}</h2><p>الأجزاء المتبقية</p></div>", unsafe_allow_html=True)
-    c3.markdown(f"<div class='dashboard-card card-green'><h2>{group_data.get('khatma_count', 0)}</h2><p>الختمات المنجزة</p></div>", unsafe_allow_html=True)
-    st.progress(completed / 30)
 
     def update_status(i, key):
         group_data['parts'][i] = st.session_state[key]
@@ -65,7 +68,8 @@ if current_group_id and current_group_id in db["groups"]:
             st.markdown(f'<div class="row-style">', unsafe_allow_html=True)
             cols = st.columns([2, 3, 5])
             cols[0].markdown(f"<span class='highlight-text'>الجزء {i+1}</span>", unsafe_allow_html=True)
-            cols[1].markdown(f"<span class='highlight-text'>{group_data['readers'][i]}</span>", unsafe_allow_html=True)
+            cols[1].markdown(f"<span class='highlight-text'>{group_data['readers'][i]}</span><br>{get_status_squares(group_data['parts'][i])}", unsafe_allow_html=True)
+            
             cols[2].radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                           index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(group_data['parts'][i]),
                           key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
