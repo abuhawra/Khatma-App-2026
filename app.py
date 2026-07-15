@@ -9,56 +9,76 @@ import os
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
 # ==========================================
-# دوال البيانات (محدثة لضمان القراءة)
+# CSS الشامل لضبط اتجاه اللغة من اليمين (RTL)
+# ==========================================
+st.markdown("""
+<style>
+    /* فرض الاتجاه من اليمين إلى اليسار على كامل التطبيق */
+    html, body, [data-testid="stAppViewContainer"] {
+        direction: rtl !important;
+        text-align: right !important;
+    }
+    
+    /* ضبط التنسيق للعناصر */
+    .stApp { direction: rtl !important; }
+    
+    /* تأمين محاذاة كافة النصوص */
+    p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea, button {
+        text-align: right !important;
+        direction: rtl !important;
+    }
+    
+    /* ضبط القوائم المنسدلة */
+    div[data-baseweb="select"] {
+        text-align: right !important;
+    }
+    
+    .dashboard-card { border-radius: 12px; padding: 20px 10px; color: white; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .gray-bg { background-color: rgba(130, 130, 130, 0.08); padding: 5px 10px; border-radius: 5px; }
+</style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# دوال إدارة البيانات
 # ==========================================
 def load_data():
     file_path = 'data.json'
-    # إذا لم يوجد الملف، ننشئ ملفاً فارغاً ببيانات أولية
     if not os.path.exists(file_path):
-        initial_data = {"groups": {}, "base_url": ""}
-        with open(file_path, 'w', encoding='utf-8') as f:
-            json.dump(initial_data, f, ensure_ascii=False, indent=4)
-        return initial_data
-    
-    # محاولة قراءة الملف
+        initial = {"groups": {}, "base_url": ""}
+        with open(file_path, 'w', encoding='utf-8') as f: json.dump(initial, f)
+        return initial
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-            # التأكد من وجود المفاتيح الأساسية
-            if "groups" not in data: data["groups"] = {}
-            if "base_url" not in data: data["base_url"] = ""
-            return data
-    except Exception as e:
-        st.error(f"خطأ في قراءة ملف البيانات: {e}")
+        with open(file_path, 'r', encoding='utf-8') as f: return json.load(f)
+    except:
         return {"groups": {}, "base_url": ""}
 
 def save_data(data):
-    with open('data.json', 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=4)
+    with open('data.json', 'w', encoding='utf-8') as f: json.dump(data, f, ensure_ascii=False, indent=4)
 
-# تحميل البيانات في كل مرة يعمل فيها السكربت
 db = load_data()
 BASE_URL = db.get("base_url", "")
 query_params = st.query_params
 
 # ==========================================
-# واجهة التحكم (لوحة الإدارة)
+# واجهة التحكم والمنطق
 # ==========================================
 st.title("⚙️ لوحة التحكم المركزية")
+
+# قراءة كلمة المرور وتأمين اللوحة
 admin_login = st.text_input("كلمة المرور:", type="password")
 
 if admin_login == "admin":
+    # استخدام مسميات واضحة ومختصرة لضمان التنسيق
     tab1, tab2, tab3, tab4 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة", "📱 المتابعة والتذكير"])
     
     with tab1:
         st.write("### روابط المجموعات:")
         if not db["groups"]:
-            st.warning("لا توجد مجموعات حالياً. أضف مجموعة من تبويب 'إضافة مجموعة'.")
+            st.warning("لا توجد مجموعات حالياً.")
         else:
             for g_id, g_info in db["groups"].items():
                 st.write(f"**{g_info['name']}**")
-                link = f"{BASE_URL}/?group={g_id}"
-                st.code(link)
+                st.code(f"{BASE_URL}/?group={g_id}")
     
     with tab2:
         g_name = st.text_input("اسم الختمة الجديدة:")
@@ -75,23 +95,32 @@ if admin_login == "admin":
                     "last_updates": {}
                 }
                 save_data(db)
-                st.success(f"تم إنشاء مجموعة {g_name} بنجاح!")
+                st.success(f"تم إنشاء {g_name} بنجاح!")
                 st.rerun()
 
     with tab3:
         if not db["groups"]:
-            st.info("لا توجد مجموعات لتعديلها.")
+            st.info("لا توجد مجموعات.")
         else:
-            e_id = st.selectbox("اختر المجموعة للتعديل:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
+            # هنا التعديلات التي طلبتها
+            e_id = st.selectbox("اختر المجموعة:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
             g_info = db["groups"][e_id]
-            new_name = st.text_input("تعديل اسم الختمة:", value=g_info["name"])
-            new_count = st.number_input("تعديل عدد الختمات المنجزة:", value=g_info.get("khatma_count", 0))
-            e_text = st.text_area("تعديل الأسماء (30 اسماً):", value="\n".join(g_info["readers"]), height=300)
-            if st.button("حفظ جميع التعديلات"):
+            
+            new_name = st.text_input("اسم الختمة:", value=g_info["name"])
+            new_count = st.number_input("الختمات المنجزة:", value=g_info.get("khatma_count", 0))
+            e_text = st.text_area("تعديل أسماء القراء (30 اسماً):", value="\n".join(g_info["readers"]), height=300)
+            
+            if st.button("حفظ التعديلات"):
                 readers = e_text.splitlines()
                 if len(readers) == 30:
-                    db["groups"][e_id].update({"name": new_name, "khatma_count": new_count, "readers": readers})
+                    g_info.update({"name": new_name, "khatma_count": new_count, "readers": readers})
                     save_data(db)
                     st.success("تم التحديث!")
                     st.rerun()
-                else: st.error("يجب إدخال 30 اسماً.")
+                else: st.error("يجب أن يكون العدد 30.")
+
+    with tab4:
+        st.write("قسم المتابعة والتذكير...")
+
+elif admin_login != "":
+    st.error("كلمة المرور خاطئة!")
