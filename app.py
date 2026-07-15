@@ -11,12 +11,18 @@ st.markdown("""
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
-    /* الصف بالكامل */
-    .row-full { display: flex; align-items: center; padding: 15px; border-bottom: 1px solid #dcdcdc; transition: background-color 0.3s; }
+    
+    /* الحاوية الرئيسية للصف - تم ضبطها لتكون مسطحة */
+    .row-wrapper { display: flex; flex-direction: column; border-bottom: 1px solid #dcdcdc; }
+    
+    /* الجزء الذي يحتوي على البيانات فقط - هنا نطبق لون الخلفية */
+    .row-content { display: flex; align-items: center; padding: 15px; transition: background-color 0.3s; }
     .row-completed { background-color: #d4edda !important; } 
+    
     .status-box { display: inline-block; width: 15px; height: 15px; margin-left: 3px; border-radius: 2px; }
     .s-green { background-color: #277953; }
     .s-gray { background-color: #e0e0e0; }
+    
     .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
     .card-green { background-color: #277953; }
     .card-yellow { background-color: #d4a32a; }
@@ -61,22 +67,23 @@ if current_group_id and current_group_id in db["groups"]:
     with tab1:
         for i in range(30):
             status = group_data['parts'][i]
-            row_class = "row-full row-completed" if status == "تمت التلاوة" else "row-full"
+            row_class = "row-content row-completed" if status == "تمت التلاوة" else "row-content"
             
+            st.markdown('<div class="row-wrapper">', unsafe_allow_html=True)
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
-            # تقسيم يدوي داخل الصف لضمان التنسيق
-            c_part, c_name, c_radio = st.columns([1, 2, 6])
             
+            cols = st.columns([2, 3, 5])
             level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
             squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
             
-            c_part.markdown(f"<span class='highlight-text'>الجزء {i+1}</span>", unsafe_allow_html=True)
-            c_name.markdown(f"<span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}", unsafe_allow_html=True)
+            cols[0].markdown(f"<span class='highlight-text'>الجزء {i+1}</span>", unsafe_allow_html=True)
+            cols[1].markdown(f"<span class='highlight-text'>{group_data['readers'][i]}</span><br>{squares_html}", unsafe_allow_html=True)
             
-            c_radio.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
+            cols[2].radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                           index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
                           key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
-            st.markdown('</div>', unsafe_allow_html=True)
+            
+            st.markdown('</div></div>', unsafe_allow_html=True)
 
     with tab2:
         for i in range(30):
@@ -89,6 +96,7 @@ if current_group_id and current_group_id in db["groups"]:
 else:
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
+        # (باقي كود لوحة التحكم)
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
         with tab1:
             base_url = st.text_input("رابط الموقع الأساسي", db.get("base_url", ""))
