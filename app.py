@@ -36,9 +36,9 @@ st.markdown("""
     div[data-testid="stWidgetLabel"] { display: none; }
     div[role="radiogroup"] { gap: 10px; }
     
-    /* === الميزة الجديدة: تظليل الصفوف المتبادلة (Zebra Striping) === */
+    /* تظليل الصفوف المتبادلة (Zebra Striping) */
     div[data-testid="stHorizontalBlock"]:has(.gray-bg) {
-        background-color: rgba(130, 130, 130, 0.08); /* رمادي فاتح مريح للعين */
+        background-color: rgba(130, 130, 130, 0.08); 
         padding-top: 10px;
         padding-bottom: 5px;
         padding-right: 15px;
@@ -65,7 +65,7 @@ def save_data(data):
     with open('data.json', 'w', encoding='utf-8') as file:
         json.dump(data, file, ensure_ascii=False, indent=4)
 
-# تحويل وتنظيف حالات القراءة القديمة لتجنب المشاكل
+# تحويل وتنظيف حالات القراءة القديمة
 def sanitize_status(status):
     if status is True or status == "تمت القراءة":
         return "تمت التلاوة"
@@ -80,13 +80,12 @@ BASE_URL = db.get("base_url", "")
 query_params = st.query_params
 
 # ==========================================
-# 1. واجهة المشاركين (تفتح مباشرة من الرابط بدون كلمة مرور)
+# 1. واجهة المشاركين 
 # ==========================================
 if "group" in query_params and query_params["group"] in db["groups"]:
     group_id = query_params["group"]
     group_data = db["groups"][group_id]
     
-    # حساب الإنجاز الذكي 
     progress_weights = {
         "لم تبدأ": 0.0,
         "نص جزء": 0.5,
@@ -117,14 +116,14 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     st.progress(progress_percentage)
     st.write("---")
 
-    tab_overview, tab_mark, tab_details, tab_schedule = st.tabs(["📊 الجدول", "✅ تأكيد الحفظ", "📖 تفاصيل", "📅 الخطة"])
+    # تغيير اسم التبويب هنا إلى "تأكيد التلاوة"
+    tab_overview, tab_mark, tab_details, tab_schedule = st.tabs(["📊 الجدول", "✅ تأكيد التلاوة", "📖 تفاصيل", "📅 الخطة"])
 
     with tab_overview:
         for i in range(30):
             col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
             
             with col1:
-                # تطبيق تظليل للصفوف الزوجية لتسهيل التمييز
                 if i % 2 == 0:
                     st.markdown(f'<span class="gray-bg"></span>**الجزء {i+1}**', unsafe_allow_html=True)
                 else:
@@ -178,7 +177,55 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 else:
                     st.error("الرقم السري خاطئ!")
 
-    with tab_mark: st.info("سيتم تفعيل الخصائص الإضافية لاحقاً.")
+    # التبويب المخصص للذين لم يكملوا التلاوة فقط
+    with tab_mark:
+        st.write("### ⏳ القراء الذين لم يكملوا التلاوة")
+        has_incomplete = False
+        display_counter = 0 # عداد لضمان أن التظليل الرمادي يعمل بشكل صحيح حتى بعد الفلترة
+        
+        for i in range(30):
+            current_status = sanitize_status(group_data['parts'][i])
+            
+            # فلترة: إظهار فقط من لم يكملوا التلاوة
+            if current_status != "تمت التلاوة":
+                has_incomplete = True
+                
+                col1_m, col2_m, col3_m = st.columns([1, 2, 7])
+                
+                with col1_m:
+                    if display_counter % 2 == 0:
+                        st.markdown(f'<span class="gray-bg"></span>**الجزء {i+1}**', unsafe_allow_html=True)
+                    else:
+                        st.write(f"**الجزء {i+1}**")
+                
+                with col2_m: 
+                    st.write(f"**{group_data['readers'][i]}**")
+                    if current_status == "حزب ونص":
+                        st.markdown("<small style='color: #d4a32a; font-weight: bold;'>● حزب ونص</small>", unsafe_allow_html=True)
+                    elif current_status in ["حزب", "نص جزء"]:
+                        st.markdown(f"<small style='color: #a47e1b; font-weight: bold;'>● {current_status}</small>", unsafe_allow_html=True)
+                    else:
+                        st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
+                
+                with col3_m:
+                    selected_mark = st.radio(
+                        f"الحالة_متأخر_{i}", 
+                        STATUS_OPTIONS, 
+                        index=STATUS_OPTIONS.index(current_status), 
+                        key=f"late_s_{i}", 
+                        horizontal=True,
+                        label_visibility="collapsed"
+                    )
+                    if selected_mark != current_status:
+                        group_data['parts'][i] = selected_mark
+                        save_data(db)
+                        st.rerun()
+                
+                display_counter += 1
+                
+        if not has_incomplete:
+            st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم بنجاح.")
+
     with tab_details: st.info("قريباً.")
     with tab_schedule: st.info("قريباً.")
 
