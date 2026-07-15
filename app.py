@@ -116,9 +116,9 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     st.progress(progress_percentage)
     st.write("---")
 
-    # تغيير اسم التبويب هنا إلى "تأكيد التلاوة"
     tab_overview, tab_mark, tab_details, tab_schedule = st.tabs(["📊 الجدول", "✅ تأكيد التلاوة", "📖 تفاصيل", "📅 الخطة"])
 
+    # --- القسم الأول: الجدول العام (يعرض الـ 30 جزءاً بالكامل وينعكس فيه أي تغيير) ---
     with tab_overview:
         for i in range(30):
             col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
@@ -154,7 +154,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 if selected != current_status:
                     group_data['parts'][i] = selected
                     save_data(db)
-                    st.rerun()
+                    st.rerun() # التحديث الفوري ينعكس على كلا القسمين
                     
             with col4:
                 if current_status == "تمت التلاوة":
@@ -177,16 +177,18 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 else:
                     st.error("الرقم السري خاطئ!")
 
-    # التبويب المخصص للذين لم يكملوا التلاوة فقط
+    # --- القسم الثاني: تأكيد التلاوة (تفاعل مباشر: يعرض المتأخرين فقط، ويشطب من يختار "تمت التلاوة") ---
     with tab_mark:
-        st.write("### ⏳ القراء الذين لم يكملوا التلاوة")
+        st.write("### ⏳ القراء الذين لم يكملوا التلاوة فقط")
+        st.caption("تنبيه: عند اختيار «تمت التلاوة» سيتم حفظ الإنجاز، ونقل الجزء إلى قائمة المكتملين في الجدول، وشطبه تلقائياً من هذه القائمة.")
+        
         has_incomplete = False
-        display_counter = 0 # عداد لضمان أن التظليل الرمادي يعمل بشكل صحيح حتى بعد الفلترة
+        display_counter = 0 
         
         for i in range(30):
             current_status = sanitize_status(group_data['parts'][i])
             
-            # فلترة: إظهار فقط من لم يكملوا التلاوة
+            # الفلترة الحية: يتم استبعاد من أتم التلاوة (شطبه من هذا التبويب)
             if current_status != "تمت التلاوة":
                 has_incomplete = True
                 
@@ -219,12 +221,13 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     if selected_mark != current_status:
                         group_data['parts'][i] = selected_mark
                         save_data(db)
+                        # بمجرد تغيير الحالة هنا إلى "تمت التلاوة"، يتم إعادة تحميل الصفحة وإخفاء البطاقة فوراً
                         st.rerun()
                 
                 display_counter += 1
                 
         if not has_incomplete:
-            st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم بنجاح.")
+            st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم وتم نقل جميع الأجزاء إلى قائمة المنجزين في الجدول الرئيسي.")
 
     with tab_details: st.info("قريباً.")
     with tab_schedule: st.info("قريباً.")
