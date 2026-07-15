@@ -63,13 +63,38 @@ def save_data(data):
         json.dump(data, file, ensure_ascii=False, indent=4)
 
 def sanitize_status(status):
-    if status is True or status == "تمت القراءة":
-        return "تمت التلاوة"
-    if status is False or status == "جاري القراءة":
-        return "لم تبدأ"
-    if status not in STATUS_OPTIONS:
-        return "لم تبدأ"
+    if status is True or status == "تمت القراءة": return "تمت التلاوة"
+    if status is False or status == "جاري القراءة": return "لم تبدأ"
+    if status not in STATUS_OPTIONS: return "لم تبدأ"
     return status
+
+# دالة ذكية لتوليد شريط التقدم المصغر تحت اسم القارئ
+def render_status_label(status, name, strike=False):
+    if strike and status == "تمت التلاوة":
+        name_html = f"<span style='color: #888; text-decoration: line-through;'>{name}</span>"
+    else:
+        name_html = f"<span style='font-weight: bold;'>{name}</span>"
+        
+    if status == "تمت التلاوة":
+        sub = "<small style='color: #277953; font-weight: bold;'>🟩🟩🟩🟩 تمت التلاوة</small>"
+    elif status == "حزب ونص":
+        sub = "<small style='color: #d4a32a; font-weight: bold;'>🟩🟩🟩⬜ حزب ونص</small>"
+    elif status == "حزب":
+        sub = "<small style='color: #a47e1b; font-weight: bold;'>🟩🟩⬜⬜ حزب</small>"
+    elif status == "نص جزء":
+        sub = "<small style='color: #e67e22; font-weight: bold;'>🟩⬜⬜⬜ نص جزء</small>"
+    else:
+        sub = "<small style='color: #888;'>⬜⬜⬜⬜ لم يبدأ بعد</small>"
+        
+    return f"<div style='line-height: 1.4;'>{name_html}<br>{sub}</div>"
+
+# دالة لتوليد النص التفاعلي لرسائل الواتساب
+def get_wa_status_text(status):
+    if status == "حزب ونص": return " 🟩🟩🟩⬜ (حزب ونص)"
+    elif status == "حزب": return " 🟩🟩⬜⬜ (حزب)"
+    elif status == "نص جزء": return " 🟩⬜⬜⬜ (نص جزء)"
+    elif status == "لم تبدأ": return " ⬜⬜⬜⬜ (لم يبدأ)"
+    return ""
 
 db = load_data()
 BASE_URL = db.get("base_url", "")
@@ -82,10 +107,11 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     group_id = query_params["group"]
     group_data = db["groups"][group_id]
     
+    # حساب الإنجاز الذكي ليتفاعل مع الأجزاء (نص، حزب...) ويزيد الشريط بمرونة
     progress_weights = {
         "لم تبدأ": 0.0,
-        "نص جزء": 0.5,
-        "حزب": 0.5,
+        "نص جزء": 0.25,
+        "حزب": 0.50,
         "حزب ونص": 0.75,
         "تمت التلاوة": 1.0
     }
@@ -118,29 +144,17 @@ if "group" in query_params and query_params["group"] in db["groups"]:
         for i in range(30):
             col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
             current_status = sanitize_status(group_data['parts'][i])
-            
-            # إعداد خلفية التظليل
             bg_span = '<span class="gray-bg"></span>' if i % 2 == 0 else ''
             
-            # عمود رقم الجزء (مع الشطب إذا اكتمل)
             with col1:
                 if current_status == "تمت التلاوة":
-                    st.markdown(f"{bg_span}<s style='color: #aaa;'>الجزء {i+1}</s>", unsafe_allow_html=True)
+                    st.markdown(f"{bg_span}<s style='color: #888;'>الجزء {i+1}</s>", unsafe_allow_html=True)
                 else:
                     st.markdown(f"{bg_span}**الجزء {i+1}**", unsafe_allow_html=True)
             
-            # عمود اسم القارئ وحالته (مع الشطب إذا اكتمل)
             with col2: 
-                if current_status == "تمت التلاوة":
-                    st.markdown(f"<s style='color: #aaa;'>{group_data['readers'][i]}</s><br><small style='color: #277953; font-weight: bold;'>● تمت التلاوة</small>", unsafe_allow_html=True)
-                else:
-                    st.markdown(f"**{group_data['readers'][i]}**", unsafe_allow_html=True)
-                    if current_status == "حزب ونص":
-                        st.markdown("<small style='color: #d4a32a; font-weight: bold;'>● حزب ونص</small>", unsafe_allow_html=True)
-                    elif current_status in ["حزب", "نص جزء"]:
-                        st.markdown(f"<small style='color: #a47e1b; font-weight: bold;'>● {current_status}</small>", unsafe_allow_html=True)
-                    else:
-                        st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
+                # استدعاء دالة العرض التفاعلية
+                st.markdown(render_status_label(current_status, group_data['readers'][i], strike=True), unsafe_allow_html=True)
                 
             with col3:
                 selected = st.radio(
@@ -196,13 +210,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                         st.write(f"**الجزء {i+1}**")
                 
                 with col2_m: 
-                    st.write(f"**{group_data['readers'][i]}**")
-                    if current_status == "حزب ونص":
-                        st.markdown("<small style='color: #d4a32a; font-weight: bold;'>● حزب ونص</small>", unsafe_allow_html=True)
-                    elif current_status in ["حزب", "نص جزء"]:
-                        st.markdown(f"<small style='color: #a47e1b; font-weight: bold;'>● {current_status}</small>", unsafe_allow_html=True)
-                    else:
-                        st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
+                    st.markdown(render_status_label(current_status, group_data['readers'][i], strike=False), unsafe_allow_html=True)
                 
                 with col3_m:
                     selected_mark = st.radio(
@@ -213,7 +221,6 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                         horizontal=True,
                         label_visibility="collapsed"
                     )
-                    # التفاعل اللحظي: بمجرد اختيار "تمت التلاوة" سيتم حفظها وتحديث الصفحة لتختفي من هنا وتُشطب في الجدول
                     if selected_mark != current_status:
                         group_data['parts'][i] = selected_mark
                         save_data(db)
@@ -313,7 +320,8 @@ else:
                 for i in range(30):
                     p_status = sanitize_status(w_info['parts'][i])
                     if p_status != "تمت التلاوة": 
-                        status_note = f" ({p_status})" if p_status != "لم تبدأ" else ""
+                        # إضافة التفاعل المرئي (شريط المربعات) لرسالة الواتساب
+                        status_note = get_wa_status_text(p_status)
                         msg.append(f"الجزء {i+1} : {w_info['readers'][i]}{status_note}")
                 
                 if not has_remaining:
