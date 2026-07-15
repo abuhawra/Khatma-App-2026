@@ -13,8 +13,8 @@ st.markdown("""
     .stApp { direction: rtl !important; }
     p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea, button { text-align: right !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
-    .row-shaded { background-color: #f0f0f0; padding: 10px; border-radius: 8px; margin-bottom: 5px; }
-    .row-normal { background-color: #ffffff; padding: 10px; border-radius: 8px; margin-bottom: 5px; }
+    .row-shaded { background-color: #f0f0f0; padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; }
+    .row-normal { background-color: #ffffff; padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; }
     .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
     .card-green { background-color: #277953; }
     .card-yellow { background-color: #d4a32a; }
@@ -45,7 +45,6 @@ if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
 
-    # الإحصائيات
     completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
     c1, c2, c3 = st.columns(3)
     c1.markdown(f"<div class='dashboard-card card-green'><h2>{completed}</h2><p>الأجزاء المكتملة</p></div>", unsafe_allow_html=True)
@@ -82,16 +81,15 @@ if current_group_id and current_group_id in db["groups"]:
 
     with tab3:
         st.write(f"### تفاصيل المجموعة: {group_data['name']}")
-        st.write(f"عدد الختمات المنجزة: {group_data.get('khatma_count', 0)}")
+        st.write(f"إجمالي الختمات المنجزة: {group_data.get('khatma_count', 0)}")
 
 else:
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
         with tab1:
-            base_url = st.text_input("ضع رابط التطبيق هنا (مثال: https://my-app.streamlit.app)", db.get("base_url", ""))
-            if st.button("حفظ الرابط"):
-                db["base_url"] = base_url; save_data(db)
+            base_url = st.text_input("ضع رابط التطبيق هنا", db.get("base_url", ""))
+            if st.button("حفظ الرابط"): db["base_url"] = base_url; save_data(db)
             for g_id, g_info in db["groups"].items():
                 st.write(f"**{g_info['name']}**")
                 st.code(f"{base_url}/?group={g_id}")
