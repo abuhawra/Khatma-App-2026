@@ -13,8 +13,8 @@ st.markdown("""
     .stApp { direction: rtl !important; }
     p, div, h1, h2, h3, h4, h5, h6, span, label, input, textarea, button { text-align: right !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
-    .row-shaded { background-color: #f0f0f0; padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; }
-    .row-normal { background-color: #ffffff; padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; }
+    /* تم حذف كلاس row-shaded و row-normal */
+    .row-style { padding: 10px; border-bottom: 1px solid #dcdcdc; border-radius: 4px; }
     .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
     .card-green { background-color: #277953; }
     .card-yellow { background-color: #d4a32a; }
@@ -62,8 +62,7 @@ if current_group_id and current_group_id in db["groups"]:
     
     with tab1:
         for i in range(30):
-            row_class = "row-shaded" if (i + 1) % 2 != 0 else "row-normal"
-            st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
+            st.markdown(f'<div class="row-style">', unsafe_allow_html=True)
             cols = st.columns([2, 3, 5])
             cols[0].markdown(f"<span class='highlight-text'>الجزء {i+1}</span>", unsafe_allow_html=True)
             cols[1].markdown(f"<span class='highlight-text'>{group_data['readers'][i]}</span>", unsafe_allow_html=True)
