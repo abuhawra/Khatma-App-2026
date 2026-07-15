@@ -5,11 +5,13 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS المحدث =================
+# ================= CSS النهائي (محاذاة يمين كاملة) =================
 st.markdown("""
 <style>
+    /* فرض الاتجاه من اليمين لليسار على كامل التطبيق */
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
+    
     .highlight-text { font-weight: bold; color: #D32F2F; }
     
     /* الحاوية الرئيسية للصف */
@@ -17,11 +19,11 @@ st.markdown("""
         display: flex; 
         flex-direction: row; 
         align-items: center; 
-        justify-content: flex-start; /* لتبدأ العناصر من اليمين */
+        justify-content: flex-start; /* التأكد من البدء من اليمين */
         padding: 15px; 
         border-bottom: 1px solid #dcdcdc; 
         transition: background-color 0.3s;
-        gap: 30px;
+        gap: 20px;
     }
     .row-completed { background-color: #d4edda !important; } 
     
@@ -32,6 +34,9 @@ st.markdown("""
     .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
     .card-green { background-color: #277953; }
     .card-yellow { background-color: #d4a32a; }
+    
+    /* تنسيق أزرار الراديو لتكون جهة اليمين */
+    div.stRadio > div { flex-direction: row-reverse; justify-content: flex-start; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -52,12 +57,11 @@ db = load_data()
 query_params = st.query_params
 current_group_id = query_params.get("group")
 
-# ================= المنطق =================
 if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
     st.title(f"📖 {group_data['name']}")
 
-    # الإحصائيات (عادت للظهور)
+    # الإحصائيات
     completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
     khatma_val = group_data.get('khatma_count', 0)
     c1, c2, c3 = st.columns(3)
@@ -78,18 +82,18 @@ if current_group_id and current_group_id in db["groups"]:
             
             st.markdown(f'<div class="{row_class}">', unsafe_allow_html=True)
             
-            # عرض الجزء والاسم فوق بعضهما في جهة اليمين
             level = {"لم تبدأ": 0, "نص جزء": 1, "حزب": 2, "حزب ونص": 3, "تمت التلاوة": 4}.get(status, 0)
             squares_html = "".join([f'<div class="status-box {"s-green" if j < level else "s-gray"}"></div>' for j in range(4)])
             
-            # كتلة البيانات (الجزء + الاسم + المربعات تحتهم)
+            # عرض الجزء والاسم في كتلة واحدة جهة اليمين
             st.markdown(f"""
-                <div style='display:flex; flex-direction:column; min-width:200px;'>
+                <div style='display:flex; flex-direction:column; min-width:220px;'>
                     <span class='highlight-text'>الجزء {i+1} - {group_data['readers'][i]}</span>
                     <div style='margin-top:5px;'>{squares_html}</div>
                 </div>
             """, unsafe_allow_html=True)
             
+            # أزرار الحالة
             st.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                      index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
                      key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
@@ -106,4 +110,24 @@ if current_group_id and current_group_id in db["groups"]:
         st.write(f"إجمالي الختمات المنجزة: {khatma_val}")
 else:
     st.title("⚙️ لوحة التحكم المركزية")
-    # ... باقي كود لوحة التحكم
+    if st.text_input("كلمة المرور:", type="password") == "admin":
+        tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
+        with tab1:
+            base_url = st.text_input("رابط الموقع الأساسي", db.get("base_url", ""))
+            if st.button("حفظ الرابط"): db["base_url"] = base_url; save_data(db)
+            for g_id, g_info in db["groups"].items():
+                st.write(f"**{g_info['name']}**"); st.code(f"{base_url}/?group={g_id}")
+        with tab2:
+            name = st.text_input("اسم الختمة:"); 
+            if st.button("إنشاء"):
+                g_id = "group_" + str(uuid.uuid4())[:8]
+                db["groups"][g_id] = {"name": name, "parts": ["لم تبدأ"]*30, "readers": [f"قارئ {i+1}" for i in range(30)], "khatma_count": 0}
+                save_data(db); st.rerun()
+        with tab3:
+            e_id = st.selectbox("المجموعة:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
+            g_info = db["groups"][e_id]
+            g_info["name"] = st.text_input("الاسم:", value=g_info["name"])
+            g_info["khatma_count"] = st.number_input("الختمات:", value=int(g_info.get("khatma_count", 0)))
+            e_text = st.text_area("الأسماء:", value="\n".join(g_info["readers"]), height=300)
+            if st.button("حفظ"):
+                g_info["readers"] = e_text.splitlines(); save_data(db); st.rerun()
