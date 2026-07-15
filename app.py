@@ -5,14 +5,15 @@ import os
 
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
-# ================= CSS النهائي (محاذاة يمين قسرية) =================
+# ================= CSS المعدل =================
 st.markdown("""
 <style>
+    /* فرض الاتجاه من اليمين لليسار */
     html, body, [data-testid="stAppViewContainer"] { direction: rtl !important; text-align: right !important; }
     .stApp { direction: rtl !important; }
     .highlight-text { font-weight: bold; color: #D32F2F; }
+    .red-note { color: #D32F2F; font-weight: bold; margin-bottom: 15px; } /* تنسيق الجملة الحمراء */
     
-    /* حاوية الصف */
     .row-wrapper { 
         padding: 15px; 
         border-bottom: 1px solid #dcdcdc; 
@@ -25,7 +26,6 @@ st.markdown("""
     .s-green { background-color: #277953; }
     .s-gray { background-color: #e0e0e0; }
     
-    /* الإحصائيات */
     .dashboard-card { border-radius: 12px; padding: 15px; color: white; margin-bottom: 10px; text-align: center; }
     .card-green { background-color: #277953; }
     .card-yellow { background-color: #d4a32a; }
@@ -34,7 +34,7 @@ st.markdown("""
 
 # ================= البيانات والمنطق =================
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(BASE_DIR, 'data.json')
+DATA_FILE = os.path.join(DATA_FILE, 'data.json')
 
 def load_data():
     if not os.path.exists(DATA_FILE): return {"groups": {}, "base_url": ""}
@@ -51,9 +51,12 @@ current_group_id = query_params.get("group")
 
 if current_group_id and current_group_id in db["groups"]:
     group_data = db["groups"][current_group_id]
+    
+    # عرض العنوان والجملة الجديدة
     st.title(f"📖 {group_data['name']}")
+    st.markdown("<p class='red-note'>تبدأ الختمة يوم الجمعة وتختم ليلة الجمعة</p>", unsafe_allow_html=True)
 
-    # إعادة الإحصائيات التي اختفت
+    # الإحصائيات
     completed = sum(1 for p in group_data.get('parts', []) if p == "تمت التلاوة")
     khatma_val = group_data.get('khatma_count', 0)
     c1, c2, c3 = st.columns(3)
@@ -82,7 +85,6 @@ if current_group_id and current_group_id in db["groups"]:
             st.radio("الحالة", ["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"],
                      index=["لم تبدأ", "نص جزء", "حزب", "حزب ونص", "تمت التلاوة"].index(status),
                      key=f"s_{i}", horizontal=True, label_visibility="collapsed", on_change=update_status, args=(i, f"s_{i}"))
-            
             st.markdown('</div>', unsafe_allow_html=True)
 
     with tab2:
@@ -94,7 +96,7 @@ if current_group_id and current_group_id in db["groups"]:
     with tab3:
         st.write(f"إجمالي الختمات المنجزة: {khatma_val}")
 else:
-    # (لوحة التحكم المركزية - كما هي)
+    # لوحة التحكم المركزية
     st.title("⚙️ لوحة التحكم المركزية")
     if st.text_input("كلمة المرور:", type="password") == "admin":
         tab1, tab2, tab3 = st.tabs(["🔗 الروابط", "➕ إضافة مجموعة", "📝 تعديل المجموعة"])
