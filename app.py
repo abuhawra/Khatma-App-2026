@@ -176,7 +176,11 @@ if "group" in query_params and query_params["group"] in db["groups"]:
 # ==========================================
 else:
     st.title("⚙️ لوحة التحكم المركزية لمدير النظام")
-    if st.text_input("كلمة المرور:", type="password") == MASTER_PASSWORD:
+    
+    # إصلاح الخطأ البرمجي هنا: تم تعريف المتغير admin_login بشكل صحيح
+    admin_login = st.text_input("كلمة المرور:", type="password")
+    
+    if admin_login == MASTER_PASSWORD:
         tab1, tab2, tab3, tab4 = st.tabs(["🔗 إعداد الروابط", "➕ إضافة مجموعة", "📝 تعديل الأسماء", "📱 تذكير ومتابعة القراء"])
         with tab1:
             st.info("انسخ رابط موقعك من أعلى المتصفح (مثال: https://khatma-app.streamlit.app) والصقه هنا.")
@@ -201,7 +205,7 @@ else:
             if st.button("إنشاء"):
                 r_list = [n.strip() for n in r_text.split('\n') if n.strip()]
                 if not g_name or not g_pass: st.error("أكمل البيانات")
-                elif len(r_list) != 30: st.error(f"يجب إدخل 30 اسم (أدخلت {len(r_list)})")
+                elif len(r_list) != 30: st.error(f"يجب إدخال 30 اسم (أدخلت {len(r_list)})")
                 else:
                     db["groups"]["group_" + str(uuid.uuid4())[:8]] = {"name": g_name, "password": g_pass, "khatma_count": 0, "parts": ["لم تبدأ"] * 30, "readers": r_list}
                     save_data(db)
