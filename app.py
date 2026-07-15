@@ -113,8 +113,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
 
     with tab_overview:
         for i in range(30):
-            # تم تعديل نسب الأعمدة لإعطاء مساحة كافية لأزرار الخيارات الأفقية
-            col1, col2, col3, col4 = st.columns([1, 2, 5.5, 1])
+            col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
             with col1: st.write(f"**الجزء {i+1}**")
             
             current_status = sanitize_status(group_data['parts'][i])
@@ -131,7 +130,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 else:
                     st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
                 
-            # استبدال القائمة المنسدلة بأزرار خيارات أفقية (Radio Buttons)
+            # أزرار خيارات أفقية (Radio Buttons)
             with col3:
                 selected = st.radio(
                     f"الحالة_{i}", 
@@ -147,11 +146,11 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     st.rerun()
                     
             with col4:
-                if current_status != "تمت التلاوة":
-                    msg = f"تذكير بقراءة *الجزء {i+1}*\nالقارئ: *{group_data['readers'][i]}*\nالحالة الحالية: *{current_status}*\nرابط تسجيل الإتمام:\n{BASE_URL}/?group={group_id}"
-                    st.link_button("📱 تذكير", f"https://wa.me/?text={urllib.parse.quote(msg)}")
-                else:
+                # يظهر هنا فقط إشارة اكتمال للقراء لتنظيف واجهتهم، وتم نقل زر التذكير للوحة الأدمن
+                if current_status == "تمت التلاوة":
                     st.markdown("<span style='color: #277953; font-weight: bold;'>✅ مكتمل</span>", unsafe_allow_html=True)
+                else:
+                    st.write("")
                     
         st.write("---")
         if completed_parts == 30.0:
@@ -178,7 +177,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
 else:
     st.title("⚙️ لوحة التحكم المركزية لمدير النظام")
     if st.text_input("كلمة المرور:", type="password") == MASTER_PASSWORD:
-        tab1, tab2, tab3, tab4 = st.tabs(["🔗 إعداد الروابط", "➕ إضافة مجموعة", "📝 تعديل الأسماء", "📱 تذكير واتساب"])
+        tab1, tab2, tab3, tab4 = st.tabs(["🔗 إعداد الروابط", "➕ إضافة مجموعة", "📝 تعديل الأسماء", "📱 تذكير ومتابعة القراء"])
         with tab1:
             st.info("انسخ رابط موقعك من أعلى المتصفح (مثال: https://khatma-app.streamlit.app) والصقه هنا.")
             new_url = st.text_input("الرابط الأساسي:", value=BASE_URL)
@@ -202,7 +201,7 @@ else:
             if st.button("إنشاء"):
                 r_list = [n.strip() for n in r_text.split('\n') if n.strip()]
                 if not g_name or not g_pass: st.error("أكمل البيانات")
-                elif len(r_list) != 30: st.error(f"يجب إدخال 30 اسم (أدخلت {len(r_list)})")
+                elif len(r_list) != 30: st.error(f"يجب إدخل 30 اسم (أدخلت {len(r_list)})")
                 else:
                     db["groups"]["group_" + str(uuid.uuid4())[:8]] = {"name": g_name, "password": g_pass, "khatma_count": 0, "parts": ["لم تبدأ"] * 30, "readers": r_list}
                     save_data(db)
@@ -220,15 +219,61 @@ else:
                         st.success("تم!")
                         st.rerun()
                     else: st.error("يجب أن يبقى العدد 30.")
+        
+        # --- التبويب المطور لمتابعة القراء وإرسال التذكيرات الفردية والجماعية ---
         with tab4:
             if db["groups"]:
-                w_id = st.selectbox("واتساب للمجموعة:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
+                w_id = st.selectbox("اختر المجموعة لمتابعة تقدم قرائها وتذكيرهم:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
                 w_info = db["groups"][w_id]
+                
+                st.write("### ⏳ القراء المتأخرون حالياً وتفاصيل تقدمهم")
+                has_remaining = False
+                
+                # عرض تفاصيل تقدم كل قارئ لم يتمم مع زر تذكير خاص به
+                for i in range(30):
+                    p_status = sanitize_status(w_info['parts'][i])
+                    if p_status != "تمت التلاوة":
+                        has_remaining = True
+                        col1_adm, col2_adm, col3_adm = st.columns([2, 2, 1])
+                        with col1_adm:
+                            st.write(f"**الجزء {i+1}**: {w_info['readers'][i]}")
+                        with col2_adm:
+                            st.write(f"التقدم الحالي: `{p_status}`")
+                        with col3_adm:
+                            app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
+                            indiv_msg = f"السلام عليكم\nتذكير بقراءة *الجزء {i+1}*\nالقارئ: *{w_info['readers'][i]}*\nالتقدم الحالي: *{p_status}*\nرابط تسجيل التقدم أو الإتمام المباشر:\n{app_link_to_use}/?group={w_id}"
+                            st.link_button("📱 تذكير", f"https://wa.me/?text={urllib.parse.quote(indiv_msg)}", key=f"indiv_wa_{i}")
+                
+                if not has_remaining:
+                    st.success("🎉 ما شاء الله! اكتملت قراءة جميع الأجزاء الـ 30 في هذه المجموعة.")
+                
+                st.write("---")
+                st.write("### 📱 التذكير الجماعي (رسالة واحدة مجمعة بالكامل للقروب)")
+                
+                # تجميع رسالة تذكير واحدة تحتوي على كافة المتأخرين وتفاصيل تقدمهم
+                app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
+                group_link = f"{app_link_to_use}/?group={w_id}"
+                
                 msg = [f"📖 *تذكير الأجزاء المتبقية - {w_info['name']}* 📖", "ـــــــــــــــــــ"]
                 for i in range(30):
                     p_status = sanitize_status(w_info['parts'][i])
                     if p_status != "تمت التلاوة": 
                         status_note = f" ({p_status})" if p_status != "لم تبدأ" else ""
                         msg.append(f"الجزء {i+1} : {w_info['readers'][i]}{status_note}")
-                msg.extend(["ـــــــــــــــــــ", f"{BASE_URL}/?group={w_id}"])
-                st.code("\n".join(msg), language="text")
+                
+                if not has_remaining:
+                    msg.append("🎉 اكتملت قراءة جميع الأجزاء بفضل الله!")
+                
+                msg.extend(["ـــــــــــــــــــ", "🔗 *رابط التسجيل المباشر:*", group_link])
+                whatsapp_text = "\n".join(msg)
+                
+                # زر إرسال الرسالة المجمعة بالكامل إلى الواتساب بضغطة واحدة
+                st.link_button("📱 إرسال التذكير الجماعي الموحد بالواتساب", f"https://wa.me/?text={urllib.parse.quote(whatsapp_text)}", use_container_width=True)
+                
+                st.write("أو يمكنك نسخ نص الرسالة يدوياً من المربع أدناه:")
+                st.code(whatsapp_text, language="text")
+            else:
+                st.info("لا توجد مجموعات مسجلة حالياً.")
+                
+    elif admin_login != "":
+        st.error("كلمة المرور خاطئة!")
