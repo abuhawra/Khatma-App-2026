@@ -7,7 +7,7 @@ import urllib.parse
 st.set_page_config(page_title="متابعة ختمة القرآن", page_icon="📖", layout="wide")
 
 # ==========================================
-# كود التصميم (CSS) للغة العربية وتنسيق الأزرار
+# كود التصميم (CSS) للغة العربية وتنسيق الأزرار والصفوف
 # ==========================================
 st.markdown("""
 <style>
@@ -34,8 +34,16 @@ st.markdown("""
     /* تحسين مظهر أزرار الخيارات الأفقية لتبدو كأزرار حقيقية متناسقة */
     div[data-testid="stMarkdownContainer"] > p { margin-bottom: 0px; }
     div[data-testid="stWidgetLabel"] { display: none; }
-    div[role="radiogroup"] {
-        gap: 10px;
+    div[role="radiogroup"] { gap: 10px; }
+    
+    /* === الميزة الجديدة: تظليل الصفوف المتبادلة (Zebra Striping) === */
+    div[data-testid="stHorizontalBlock"]:has(.gray-bg) {
+        background-color: rgba(130, 130, 130, 0.08); /* رمادي فاتح مريح للعين */
+        padding-top: 10px;
+        padding-bottom: 5px;
+        padding-right: 15px;
+        border-radius: 10px;
+        margin-bottom: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -78,7 +86,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     group_id = query_params["group"]
     group_data = db["groups"][group_id]
     
-    # حساب الإنجاز الذكي بناءً على الخيارات الجديدة
+    # حساب الإنجاز الذكي 
     progress_weights = {
         "لم تبدأ": 0.0,
         "نص جزء": 0.5,
@@ -114,11 +122,16 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     with tab_overview:
         for i in range(30):
             col1, col2, col3, col4 = st.columns([1, 2, 6, 1])
-            with col1: st.write(f"**الجزء {i+1}**")
+            
+            with col1:
+                # تطبيق تظليل للصفوف الزوجية لتسهيل التمييز
+                if i % 2 == 0:
+                    st.markdown(f'<span class="gray-bg"></span>**الجزء {i+1}**', unsafe_allow_html=True)
+                else:
+                    st.write(f"**الجزء {i+1}**")
             
             current_status = sanitize_status(group_data['parts'][i])
             
-            # عمود القارئ مع إظهار الحالة الملونة تحته
             with col2: 
                 st.write(f"**{group_data['readers'][i]}**")
                 if current_status == "تمت التلاوة":
@@ -130,7 +143,6 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                 else:
                     st.markdown("<small style='color: #888;'>● لم يبدأ بعد</small>", unsafe_allow_html=True)
                 
-            # أزرار خيارات أفقية (Radio Buttons)
             with col3:
                 selected = st.radio(
                     f"الحالة_{i}", 
@@ -146,7 +158,6 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     st.rerun()
                     
             with col4:
-                # يظهر هنا فقط إشارة اكتمال للقراء لتنظيف واجهتهم، وتم نقل زر التذكير للوحة الأدمن
                 if current_status == "تمت التلاوة":
                     st.markdown("<span style='color: #277953; font-weight: bold;'>✅ مكتمل</span>", unsafe_allow_html=True)
                 else:
@@ -172,12 +183,10 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     with tab_schedule: st.info("قريباً.")
 
 # ==========================================
-# 2. لوحة التحكم المركزية (تظهر عند الدخول للرابط الأساسي)
+# 2. لوحة التحكم المركزية 
 # ==========================================
 else:
     st.title("⚙️ لوحة التحكم المركزية لمدير النظام")
-    
-    # إصلاح الخطأ البرمجي هنا: تم تعريف المتغير admin_login بشكل صحيح
     admin_login = st.text_input("كلمة المرور:", type="password")
     
     if admin_login == MASTER_PASSWORD:
@@ -224,7 +233,6 @@ else:
                         st.rerun()
                     else: st.error("يجب أن يبقى العدد 30.")
         
-        # --- التبويب المطور لمتابعة القراء وإرسال التذكيرات الفردية والجماعية ---
         with tab4:
             if db["groups"]:
                 w_id = st.selectbox("اختر المجموعة لمتابعة تقدم قرائها وتذكيرهم:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
@@ -233,7 +241,6 @@ else:
                 st.write("### ⏳ القراء المتأخرون حالياً وتفاصيل تقدمهم")
                 has_remaining = False
                 
-                # عرض تفاصيل تقدم كل قارئ لم يتمم مع زر تذكير خاص به
                 for i in range(30):
                     p_status = sanitize_status(w_info['parts'][i])
                     if p_status != "تمت التلاوة":
@@ -254,7 +261,6 @@ else:
                 st.write("---")
                 st.write("### 📱 التذكير الجماعي (رسالة واحدة مجمعة بالكامل للقروب)")
                 
-                # تجميع رسالة تذكير واحدة تحتوي على كافة المتأخرين وتفاصيل تقدمهم
                 app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
                 group_link = f"{app_link_to_use}/?group={w_id}"
                 
@@ -271,7 +277,6 @@ else:
                 msg.extend(["ـــــــــــــــــــ", "🔗 *رابط التسجيل المباشر:*", group_link])
                 whatsapp_text = "\n".join(msg)
                 
-                # زر إرسال الرسالة المجمعة بالكامل إلى الواتساب بضغطة واحدة
                 st.link_button("📱 إرسال التذكير الجماعي الموحد بالواتساب", f"https://wa.me/?text={urllib.parse.quote(whatsapp_text)}", use_container_width=True)
                 
                 st.write("أو يمكنك نسخ نص الرسالة يدوياً من المربع أدناه:")
