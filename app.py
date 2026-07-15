@@ -69,7 +69,6 @@ def sanitize_status(status):
     if status not in STATUS_OPTIONS: return "لم تبدأ"
     return status
 
-# دالة لتوليد شريط التقدم المصغر تحت اسم القارئ
 def render_status_label(status, name, strike=False):
     if strike and status == "تمت التلاوة":
         name_html = f"<span style='color: #888; text-decoration: line-through;'>{name}</span>"
@@ -107,15 +106,12 @@ if "group" in query_params and query_params["group"] in db["groups"]:
     group_id = query_params["group"]
     group_data = db["groups"][group_id]
     
-    # دالة التحديث الذكية والمزامنة الفورية مع حفظ الوقت والتاريخ
     def update_part_status(part_index, source_key):
         new_status = st.session_state[source_key]
         
-        # التأكد من وجود قاموس التحديثات الأخيرة في بيانات المجموعة
         if "last_updates" not in group_data:
             group_data["last_updates"] = {}
             
-        # التقاط وحفظ تفاصيل وقت وتاريخ التحديث الفعلي
         now_dt = datetime.datetime.now()
         now_time = now_dt.strftime("%Y-%m-%d  %I:%M %p")
         
@@ -205,7 +201,7 @@ if "group" in query_params and query_params["group"] in db["groups"]:
                     readers = group_data["readers"]
                     group_data["readers"] = [readers[-1]] + readers[:-1] 
                     group_data["parts"] = ["لم تبدأ"] * 30 
-                    group_data["last_updates"] = {} # تصفير أوقات التحديثات للختمة الجديدة
+                    group_data["last_updates"] = {} 
                     save_data(db)
                     st.success("تم إغلاق الختمة وترحيل الأسماء!")
                     st.rerun()
@@ -250,14 +246,12 @@ if "group" in query_params and query_params["group"] in db["groups"]:
         if not has_incomplete:
             st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم بنجاح.")
 
-    # ================= التبويب المطور (أحدث 5 متأخرين مع التاريخ والوقت) =================
     with tab_details: 
         st.write("### ⏳ أحدث القراء تفاعلاً (غير المكتملين بعد)")
         
         incomplete_list = []
         last_updates_dict = group_data.get("last_updates", {})
         
-        # تجميع كافة الأجزاء التي لم تصل بعد لحالة "تمت التلاوة"
         for i in range(30):
             p_status = sanitize_status(group_data['parts'][i])
             if p_status != "تمت التلاوة":
@@ -280,14 +274,10 @@ if "group" in query_params and query_params["group"] in db["groups"]:
         if not incomplete_list:
             st.success("🎉 ما شاء الله! جميع القراء أتموا تلاوتهم بنجاح ولا توجد أجزاء متأخرة.")
         else:
-            # ترتيب تنازلي: القراء الذين تم تحديث حالتهم مؤخراً في الأعلى
             sorted_incomplete = sorted(incomplete_list, key=lambda x: x["timestamp"], reverse=True)
-            
-            # جلب آخر 5 متأخرين تفاعلوا فقط
             last_5_late = sorted_incomplete[:5]
             
             for idx, item in enumerate(last_5_late):
-                # تحديد أيقونة التقدم بناءً على الحالة الحالية للمتأخر
                 status_color = "#e67e22" if item['status'] != "لم تبدأ" else "#888"
                 
                 st.markdown(f"""
@@ -361,49 +351,57 @@ else:
                 w_id = st.selectbox("اختر المجموعة لمتابعة تقدم قرائها وتذكيرهم:", list(db["groups"].keys()), format_func=lambda x: db["groups"][x]["name"])
                 w_info = db["groups"][w_id]
                 
-                st.write("### ⏳ القراء المتأخرون حالياً وتفاصيل تقدمهم")
-                has_remaining = False
-                
-                for i in range(30):
-                    p_status = sanitize_status(w_info['parts'][i])
-                    if p_status != "تمت التلاوة":
-                        has_remaining = True
-                        col1_adm, col2_adm, col3_adm = st.columns([2, 2, 1])
-                        with col1_adm:
-                            st.write(f"**الجزء {i+1}**: {w_info['readers'][i]}")
-                        with col2_adm:
-                            st.write(f"التقدم الحالي: `{p_status}`")
-                        with col3_adm:
-                            app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
-                            indiv_msg = f"السلام عليكم\nتذكير بقراءة *الجزء {i+1}*\nالقارئ: *{w_info['readers'][i]}*\nالتقدم الحالي: *{p_status}*\nرابط تسجيل التقدم أو الإتمام المباشر:\n{app_link_to_use}/?group={w_id}"
-                            st.link_button("📱 تذكير", f"https://wa.me/?text={urllib.parse.quote(indiv_msg)}", key=f"indiv_wa_{i}")
-                
-                if not has_remaining:
-                    st.success("🎉 ما شاء الله! اكتملت قراءة جميع الأجزاء الـ 30 في هذه المجموعة.")
-                
+                # طبقة الحماية الجديدة: طلب كلمة مرور المجموعة لفتح القسم
                 st.write("---")
-                st.write("### 📱 التذكير الجماعي (رسالة واحدة مجمعة بالكامل للقروب)")
+                group_pass_input = st.text_input(f"🔒 يرجى إدخال كلمة مرور مجموعة ({w_info['name']}) لعرض التفاصيل وإرسال التذكيرات:", type="password", key=f"pass_check_{w_id}")
                 
-                app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
-                group_link = f"{app_link_to_use}/?group={w_id}"
-                
-                msg = [f"📖 *تذكير الأجزاء المتبقية - {w_info['name']}* 📖", "ـــــــــــــــــــ"]
-                for i in range(30):
-                    p_status = sanitize_status(w_info['parts'][i])
-                    if p_status != "تمت التلاوة": 
-                        status_note = get_wa_status_text(p_status)
-                        msg.append(f"الجزء {i+1} : {w_info['readers'][i]}{status_note}")
-                
-                if not has_remaining:
-                    msg.append("🎉 اكتملت قراءة جميع الأجزاء بفضل الله!")
-                
-                msg.extend(["ـــــــــــــــــــ", "🔗 *رابط التسجيل المباشر:*", group_link])
-                whatsapp_text = "\n".join(msg)
-                
-                st.link_button("📱 إرسال التذكير الجماعي الموحد بالواتساب", f"https://wa.me/?text={urllib.parse.quote(whatsapp_text)}", use_container_width=True)
-                
-                st.write("أو يمكنك نسخ نص الرسالة يدوياً من المربع أدناه:")
-                st.code(whatsapp_text, language="text")
+                if group_pass_input == w_info["password"]:
+                    st.write("### ⏳ القراء المتأخرون حالياً وتفاصيل تقدمهم")
+                    has_remaining = False
+                    
+                    for i in range(30):
+                        p_status = sanitize_status(w_info['parts'][i])
+                        if p_status != "تمت التلاوة":
+                            has_remaining = True
+                            col1_adm, col2_adm, col3_adm = st.columns([2, 2, 1])
+                            with col1_adm:
+                                st.write(f"**الجزء {i+1}**: {w_info['readers'][i]}")
+                            with col2_adm:
+                                st.write(f"التقدم الحالي: `{p_status}`")
+                            with col3_adm:
+                                app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
+                                indiv_msg = f"السلام عليكم\nتذكير بقراءة *الجزء {i+1}*\nالقارئ: *{w_info['readers'][i]}*\nالتقدم الحالي: *{p_status}*\nرابط تسجيل التقدم أو الإتمام المباشر:\n{app_link_to_use}/?group={w_id}"
+                                st.link_button("📱 تذكير", f"https://wa.me/?text={urllib.parse.quote(indiv_msg)}", key=f"indiv_wa_{i}")
+                    
+                    if not has_remaining:
+                        st.success("🎉 ما شاء الله! اكتملت قراءة جميع الأجزاء الـ 30 في هذه المجموعة.")
+                    
+                    st.write("---")
+                    st.write("### 📱 التذكير الجماعي (رسالة واحدة مجمعة بالكامل للقروب)")
+                    
+                    app_link_to_use = BASE_URL if BASE_URL else "الرابط_غير_متوفر"
+                    group_link = f"{app_link_to_use}/?group={w_id}"
+                    
+                    msg = [f"📖 *تذكير الأجزاء المتبقية - {w_info['name']}* 📖", "ـــــــــــــــــــ"]
+                    for i in range(30):
+                        p_status = sanitize_status(w_info['parts'][i])
+                        if p_status != "تمت التلاوة": 
+                            status_note = get_wa_status_text(p_status)
+                            msg.append(f"الجزء {i+1} : {w_info['readers'][i]}{status_note}")
+                    
+                    if not has_remaining:
+                        msg.append("🎉 اكتملت قراءة جميع الأجزاء بفضل الله!")
+                    
+                    msg.extend(["ـــــــــــــــــــ", "🔗 *رابط التسجيل المباشر:*", group_link])
+                    whatsapp_text = "\n".join(msg)
+                    
+                    st.link_button("📱 إرسال التذكير الجماعي الموحد بالواتساب", f"https://wa.me/?text={urllib.parse.quote(whatsapp_text)}", use_container_width=True)
+                    
+                    st.write("أو يمكنك نسخ نص الرسالة يدوياً من المربع أدناه:")
+                    st.code(whatsapp_text, language="text")
+                    
+                elif group_pass_input != "":
+                    st.error("كلمة مرور المجموعة غير صحيحة! لا يمكنك عرض بيانات هذه المجموعة.")
             else:
                 st.info("لا توجد مجموعات مسجلة حالياً.")
                 
